@@ -381,13 +381,25 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label d522295
+  --label f607edb
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
 through the auto alias-view path, runs the semantic comparator, and records the
 small generated Qwen3 config view. Add `--profile` to capture an NSYS report for
 the same actual-dump path.
+
+The script was validated on the 4090-D host at `f607edb` and produced:
+
+```text
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-f607edb.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-f607edb.txt
+semantic comparison: ok
+auto view:
+  config.json 306 bytes
+  generation_config.json 29 bytes
+  higgs-qwen3-tensor-aliases.json 34933 bytes
+```
 
 The underlying actual-dump command remains:
 
