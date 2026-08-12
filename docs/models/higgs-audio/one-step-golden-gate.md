@@ -420,7 +420,7 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label d94624b
+  --label c563a9d
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
@@ -429,16 +429,17 @@ prompt-only retained KV session path, compares that session actual against the
 same golden, and records the small generated Qwen3 config view. Add `--profile`
 to capture an NSYS report for the same actual-dump path.
 
-The script was validated on the 4090-D host at `d94624b` after the retained
-prompt-session bridge, `HiggsAudioRuntime` API surface, and duplicate
-request-id guard landed, producing the complete gate artifact set:
+The script was validated on the 4090-D host at `c563a9d` after the retained
+prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
+request-id guard, and persisted session-smoke log landed, producing the complete
+gate artifact set:
 
 ```text
-actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-d94624b.safetensors
-session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-d94624b.safetensors
-compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-d94624b.txt
-smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-d94624b.txt
-session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-d94624b.txt
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-c563a9d.safetensors
+session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-c563a9d.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-c563a9d.txt
+smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-c563a9d.txt
+session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-c563a9d.txt
 semantic comparison: ok
 session semantic comparison: ok
 duplicate_request_id_guard: ok
