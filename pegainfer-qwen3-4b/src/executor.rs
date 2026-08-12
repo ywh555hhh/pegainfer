@@ -237,6 +237,14 @@ fn execute_step_on_lane(
                 Ok(WorkerStepOutcome::Ack)
             }
         }
+        StepCommand::PrefillLayer0Stages { prompt, kv_view } => {
+            let stages = lane.execute_prefill_layer0_stages(prompt, kv_view)?;
+            if collect_result {
+                Ok(WorkerStepOutcome::PrefillStages(stages))
+            } else {
+                Ok(WorkerStepOutcome::Ack)
+            }
+        }
         StepCommand::Unified {
             prefill_requests,
             prefill_kv_views,
@@ -422,6 +430,11 @@ pub struct PrefillLayerHiddenResult {
     pub embedding_hidden_bf16: Vec<half::bf16>,
     pub layer_hidden_bf16: Vec<Vec<half::bf16>>,
     pub final_normed_bf16: Vec<half::bf16>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PrefillStageResult {
+    pub stages: Vec<(String, Vec<half::bf16>)>,
 }
 
 pub(crate) trait ModelExecutor: Send {
@@ -715,6 +728,35 @@ impl Qwen3Executor {
             WorkerStepOutcome::PrefillLayerHidden(result) => Ok(result),
             other => Err(anyhow::anyhow!(
                 "prefill layer hidden returned unexpected: {}",
+                other.kind()
+            )),
+        }
+    }
+
+    pub fn prefill_layer0_stages_bf16(
+        &mut self,
+        prompt_tokens: Vec<u32>,
+    ) -> Result<PrefillStageResult> {
+        anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
+        let mut rkv = self.kv_mgr.new_request(
+            prompt_tokens.clone(),
+            1,
+            self.active_lora_adapter.as_deref(),
+        );
+        rkv.schedule_prefill(prompt_tokens.len(), &self.kv_mgr)
+            .map_err(|e| {
+                anyhow::anyhow!("schedule_prefill failed for diagnostic layer0 stage dump: {e}")
+            })?;
+        let kv_view = rkv.prefill_view(prompt_tokens.len());
+        let step = StepCommand::PrefillLayer0Stages {
+            prompt: prompt_tokens,
+            kv_view,
+        };
+        let outcome = self.run_step(&step)?;
+        match outcome {
+            WorkerStepOutcome::PrefillStages(result) => Ok(result),
+            other => Err(anyhow::anyhow!(
+                "prefill layer0 stages returned unexpected: {}",
                 other.kind()
             )),
         }
@@ -1337,6 +1379,33 @@ impl LocalQwen3Lane {
         })
     }
 
+    fn execute_prefill_layer0_stages(
+        &mut self,
+        prompt: &[u32],
+        kv_view: &KvView,
+    ) -> Result<PrefillStageResult> {
+        let stages = self.model.prefill_layer0_stage_snapshots(
+            prompt,
+            kv_view,
+            self.kv_buffer.buffer(),
+            &self.layout,
+        )?;
+        let mut host_stages = Vec::with_capacity(stages.len());
+        for stage in stages {
+            let values = self
+                .model
+                .device_ctx()
+                .stream
+                .clone_dtoh(&stage.values.data)
+                .map_err(|e| anyhow::anyhow!("D2H {} copy failed: {e}", stage.name))?;
+            host_stages.push((stage.name.to_string(), values));
+        }
+        self.model.device_ctx().sync()?;
+        Ok(PrefillStageResult {
+            stages: host_stages,
+        })
+    }
+
     fn execute_decode(&mut self, token_ids: &[u32], kv_views: &[KvView]) -> Result<()> {
         self.model.batch_decode(
             token_ids,
@@ -1410,6 +1479,10 @@ enum StepCommand {
         prompt: Vec<u32>,
         kv_view: KvView,
     },
+    PrefillLayer0Stages {
+        prompt: Vec<u32>,
+        kv_view: KvView,
+    },
 }
 
 impl StepCommand {
@@ -1420,6 +1493,7 @@ impl StepCommand {
             Self::Unified { .. } => "unified",
             Self::PrefillLastHidden { .. } => "prefill_hidden",
             Self::PrefillLayerHidden { .. } => "prefill_layer_hidden",
+            Self::PrefillLayer0Stages { .. } => "prefill_layer0_stages",
         }
     }
 }
@@ -1454,6 +1528,7 @@ enum WorkerStepOutcome {
     Unified(UnifiedResult),
     PrefillHidden(PrefillHiddenResult),
     PrefillLayerHidden(PrefillLayerHiddenResult),
+    PrefillStages(PrefillStageResult),
 }
 
 impl WorkerStepOutcome {
@@ -1465,6 +1540,7 @@ impl WorkerStepOutcome {
             Self::Unified(_) => "unified",
             Self::PrefillHidden(_) => "prefill_hidden",
             Self::PrefillLayerHidden(_) => "prefill_layer_hidden",
+            Self::PrefillStages(_) => "prefill_layer0_stages",
         }
     }
 }

@@ -31,5 +31,10 @@ name = "higgs_dump_prefill_layer_hidden"
 path = "src/bin/higgs_dump_prefill_layer_hidden.rs"
 required-features = ["runtime-qwen3"]
 
+[[bin]]
+name = "higgs_dump_layer0_stages"
+path = "src/bin/higgs_dump_layer0_stages.rs"
+required-features = ["runtime-qwen3"]
+
 [lints]
 workspace = true

@@ -98,3 +98,60 @@ pub fn write_layer_hidden_dump(
         hidden_values_per_layer: HIDDEN_SIZE,
     })
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StageDumpSummary {
+    pub output_path: PathBuf,
+    pub prompt_tokens: usize,
+    pub stages: usize,
+    pub values: usize,
+}
+
+pub fn write_stage_dump(
+    output_path: impl AsRef<Path>,
+    prompt: &PromptTensors,
+    stages: &[(String, Vec<bf16>)],
+) -> Result<StageDumpSummary> {
+    ensure!(!stages.is_empty(), "stage dump requires at least one stage");
+    let mut tensors = BTreeMap::from([
+        (
+            PROMPT_INPUT_IDS.to_string(),
+            owned_i64(
+                &[1, prompt.input_ids_padded.len()],
+                &prompt.input_ids_padded,
+            ),
+        ),
+        (
+            PROMPT_ATTENTION_MASK.to_string(),
+            owned_i64(&[1, prompt.attention_mask.len()], &prompt.attention_mask),
+        ),
+        (
+            PROMPT_LENGTHS.to_string(),
+            owned_i64(&[prompt.lengths.len()], &prompt.lengths),
+        ),
+    ]);
+    let mut values = 0usize;
+    for (name, stage_values) in stages {
+        ensure!(!stage_values.is_empty(), "stage {name} must not be empty");
+        values += stage_values.len();
+        tensors.insert(
+            name.clone(),
+            owned_bf16(&[1, stage_values.len()], stage_values),
+        );
+    }
+
+    let output_path = output_path.as_ref();
+    let metadata = HashMap::from([(
+        "fixture_kind".to_string(),
+        "higgs-layer0-stage-actual".to_string(),
+    )]);
+    safetensors::serialize_to_file(tensors, Some(metadata), output_path)
+        .with_context(|| format!("write {}", output_path.display()))?;
+
+    Ok(StageDumpSummary {
+        output_path: output_path.to_path_buf(),
+        prompt_tokens: prompt.prompt_ids()?.len(),
+        stages: stages.len(),
+        values,
+    })
+}
