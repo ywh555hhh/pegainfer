@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.metadata
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -22,6 +24,7 @@ DIRECT_MODULES = (
     "sglang_omni.models.higgs_tts.hf_config",
 )
 FULL_MODEL_MODULE = "sglang_omni.models.higgs_tts.model"
+TORCH_POOL_API = "_cuda_beginAllocateCurrentThreadToPool"
 
 
 def git_short_commit(path: Path) -> str:
@@ -40,6 +43,66 @@ def module_status(name: str) -> tuple[str, str]:
     except Exception as exc:
         return "fail", f"{type(exc).__name__}:{exc}"
     return "ok", ""
+
+
+def package_version(name: str) -> str:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "missing"
+
+
+def torch_stack() -> dict[str, str]:
+    try:
+        import torch
+        import torch.cuda.memory as torch_cuda_memory
+    except Exception as exc:
+        reason = normalize_reason(f"{type(exc).__name__}:{exc}")
+        return {
+            "package.torch.version": package_version("torch"),
+            "package.torch.cuda": "unknown",
+            "package.torch.has_cuda_begin_allocate_current_thread_to_pool": "fail",
+            "package.torch.import_reason": reason,
+        }
+
+    return {
+        "package.torch.version": str(torch.__version__),
+        "package.torch.cuda": str(torch.version.cuda),
+        "package.torch.has_cuda_begin_allocate_current_thread_to_pool": "ok"
+        if hasattr(torch_cuda_memory, TORCH_POOL_API)
+        else "fail",
+    }
+
+
+def normalize_dependency_name(spec: str) -> str:
+    name = spec.split(";", 1)[0].strip()
+    for sep in ("[", "<", ">", "=", "!", "~"):
+        name = name.split(sep, 1)[0].strip()
+    return name.replace("_", "-").lower()
+
+
+def pyproject_requirements(src: Path) -> dict[str, str]:
+    pyproject = src / "pyproject.toml"
+    if not pyproject.is_file():
+        return {}
+    data = tomllib.loads(pyproject.read_text())
+    project = data.get("project", {})
+    deps = project.get("dependencies", [])
+    by_name = {normalize_dependency_name(dep): dep for dep in deps}
+    wanted = (
+        "torch",
+        "sglang",
+        "transformers",
+        "flash-attn-4",
+        "flashinfer-python",
+        "nvidia-cutlass-dsl",
+    )
+    out = {
+        "pyproject.requires_python": str(project.get("requires-python", "unknown")),
+    }
+    for name in wanted:
+        out[f"pyproject.dependency.{name}"] = by_name.get(name, "missing")
+    return out
 
 
 def normalize_reason(reason: str) -> str:
@@ -80,6 +143,15 @@ def main() -> None:
 
     print_kv("sglang_omni_src", str(src))
     print_kv("sglang_omni_commit", git_short_commit(src))
+    print_kv("python.executable", sys.executable)
+    print_kv("python.version", sys.version.replace("\n", " "))
+    for key, value in pyproject_requirements(src).items():
+        print_kv(key, value)
+    for key, value in torch_stack().items():
+        print_kv(key, value)
+    print_kv("package.sglang.version", package_version("sglang"))
+    print_kv("package.transformers.version", package_version("transformers"))
+    print_kv("package.sgl-kernel.version", package_version("sgl-kernel"))
 
     direct_ok = True
     for name in DIRECT_MODULES:

@@ -13,9 +13,17 @@ REQUIRED_KEYS = {
     "commit",
     "label",
     "python",
+    "python_version",
     "sglang_omni_src",
     "sglang_omni_commit",
     "readiness_log",
+    "pyproject_torch",
+    "pyproject_sglang",
+    "torch_version",
+    "torch_cuda",
+    "torch_has_cuda_pool_api",
+    "sglang_version",
+    "transformers_version",
     "sglang_omni_direct_imports",
     "sglang_omni_full_model_import",
     "runtime_ready",
@@ -95,6 +103,20 @@ def validate(args: argparse.Namespace) -> dict[str, str]:
     if not values["sglang_omni_commit"]:
         raise ValueError("sglang_omni_commit is empty")
 
+    nonempty_keys = (
+        "python_version",
+        "pyproject_torch",
+        "pyproject_sglang",
+        "torch_version",
+        "torch_cuda",
+        "torch_has_cuda_pool_api",
+        "sglang_version",
+        "transformers_version",
+    )
+    for key in nonempty_keys:
+        if not values[key]:
+            raise ValueError(f"{key} is empty")
+
     if values["status"] == "ok" and values["sglang_omni_direct_imports"] != "ok":
         raise ValueError("status=ok requires sglang_omni_direct_imports=ok")
 
@@ -110,6 +132,20 @@ def validate(args: argparse.Namespace) -> dict[str, str]:
     if args.check_files:
         readiness_log = Path(values["readiness_log"])
         require_nonempty_file(readiness_log)
+        log_mirrors = {
+            "python.version": values["python_version"],
+            "pyproject.dependency.torch": values["pyproject_torch"],
+            "pyproject.dependency.sglang": values["pyproject_sglang"],
+            "package.torch.version": values["torch_version"],
+            "package.torch.cuda": values["torch_cuda"],
+            "package.torch.has_cuda_begin_allocate_current_thread_to_pool": values[
+                "torch_has_cuda_pool_api"
+            ],
+            "package.sglang.version": values["sglang_version"],
+            "package.transformers.version": values["transformers_version"],
+        }
+        for key, value in log_mirrors.items():
+            require_log_line(readiness_log, f"{key}={value}")
         require_log_line(
             readiness_log,
             f"direct_higgs_imports={values['sglang_omni_direct_imports']}",

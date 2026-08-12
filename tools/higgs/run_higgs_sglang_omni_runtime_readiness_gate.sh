@@ -108,6 +108,14 @@ echo "summary:          $gate_summary"
 require_nonempty_file "$readiness_log"
 
 sglang_omni_commit="$(grep '^sglang_omni_commit=' "$readiness_log" | cut -d= -f2-)"
+python_version="$(grep '^python.version=' "$readiness_log" | cut -d= -f2-)"
+pyproject_torch="$(grep '^pyproject.dependency.torch=' "$readiness_log" | cut -d= -f2-)"
+pyproject_sglang="$(grep '^pyproject.dependency.sglang=' "$readiness_log" | cut -d= -f2-)"
+torch_version="$(grep '^package.torch.version=' "$readiness_log" | cut -d= -f2-)"
+torch_cuda="$(grep '^package.torch.cuda=' "$readiness_log" | cut -d= -f2-)"
+torch_has_cuda_pool_api="$(grep '^package.torch.has_cuda_begin_allocate_current_thread_to_pool=' "$readiness_log" | cut -d= -f2-)"
+sglang_version="$(grep '^package.sglang.version=' "$readiness_log" | cut -d= -f2-)"
+transformers_version="$(grep '^package.transformers.version=' "$readiness_log" | cut -d= -f2-)"
 direct_imports="$(grep '^direct_higgs_imports=' "$readiness_log" | cut -d= -f2-)"
 full_model_import="$(grep '^full_higgs_model_import=' "$readiness_log" | cut -d= -f2-)"
 status="fail"
@@ -123,9 +131,17 @@ repo=$repo_root
 commit=$(git -C "$repo_root" rev-parse --short HEAD)
 label=$label
 python=$python_bin
+python_version=$python_version
 sglang_omni_src=$sglang_omni_src
 sglang_omni_commit=$sglang_omni_commit
 readiness_log=$readiness_log
+pyproject_torch=$pyproject_torch
+pyproject_sglang=$pyproject_sglang
+torch_version=$torch_version
+torch_cuda=$torch_cuda
+torch_has_cuda_pool_api=$torch_has_cuda_pool_api
+sglang_version=$sglang_version
+transformers_version=$transformers_version
 sglang_omni_direct_imports=$direct_imports
 sglang_omni_full_model_import=$full_model_import
 runtime_ready=$runtime_ready

@@ -175,20 +175,28 @@ comparison against the same fixture.
 
 A minimal isolated import environment was also attempted on the 4090-D host at
 `/data/venvs/sglang-omni-import`. It uses `--system-site-packages` to reuse the
-machine's CUDA 12.8 PyTorch (`torch 2.6.0a0+ecf3bae40a.nv25.1`) and then installs
+machine's CUDA 12.8 PyTorch (`torch 2.6.0a0+ecf3bae40a.nv25.01`) and then installs
 only the missing import-layer packages (`sglang==0.5.16`, `sgl-kernel`,
 `transformers==5.12.1`, `huggingface-hub`, `regex>=2025.10.22`,
 `tokenizers==0.23.0rc0`, `orjson`, `pybase64`, and common server utilities). The
 latest gate artifact is:
 
 ```text
-/data/results/pegainfer/higgs-audio/actual/higgs-sglang-omni-runtime-readiness-gate-sglang-import-common-deps.txt
+/data/results/pegainfer/higgs-audio/actual/higgs-sglang-omni-runtime-readiness-gate-sglang-stack-fingerprint.txt
 ```
 
 That attempt restores direct Higgs source imports, but still fails the full
-runtime model import:
+runtime model import. The readiness summary now records the relevant stack
+fingerprint directly:
 
 ```text
+pyproject_torch=torch==2.11.0
+pyproject_sglang=sglang==0.5.16
+torch_version=2.6.0a0+ecf3bae40a.nv25.01
+torch_cuda=12.8
+torch_has_cuda_pool_api=fail
+sglang_version=0.5.16
+transformers_version=5.12.1
 sglang_omni_direct_imports=ok
 sglang_omni_full_model_import=ImportError:cannot import name '_cuda_beginAllocateCurrentThreadToPool' from 'torch.cuda.memory' (/usr/local/lib/python3.12/dist-packages/torch/cuda/memory.py)
 runtime_ready=fail

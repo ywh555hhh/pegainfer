@@ -106,6 +106,14 @@ python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py" 
   --check-files
 
 printf '%s\n' \
+  'python.version=3.12 isolated' \
+  'pyproject.dependency.torch=torch==2.11.0' \
+  'pyproject.dependency.sglang=sglang==0.5.16' \
+  'package.torch.version=2.11.0' \
+  'package.torch.cuda=13.0' \
+  'package.torch.has_cuda_begin_allocate_current_thread_to_pool=ok' \
+  'package.sglang.version=0.5.16' \
+  'package.transformers.version=5.12.1' \
   'direct_higgs_imports=ok' \
   'full_higgs_model_import=ok' \
   >"$summary_tmp/runtime-readiness.txt"
@@ -115,9 +123,17 @@ printf '%s\n' \
   'commit=isolated' \
   'label=isolated' \
   'python=python3' \
+  'python_version=3.12 isolated' \
   'sglang_omni_src=/src/sglang-omni' \
   'sglang_omni_commit=abc1234' \
   "readiness_log=$summary_tmp/runtime-readiness.txt" \
+  'pyproject_torch=torch==2.11.0' \
+  'pyproject_sglang=sglang==0.5.16' \
+  'torch_version=2.11.0' \
+  'torch_cuda=13.0' \
+  'torch_has_cuda_pool_api=ok' \
+  'sglang_version=0.5.16' \
+  'transformers_version=5.12.1' \
   'sglang_omni_direct_imports=ok' \
   'sglang_omni_full_model_import=ok' \
   'runtime_ready=ok' \
