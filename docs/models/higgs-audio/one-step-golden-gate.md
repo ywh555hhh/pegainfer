@@ -41,6 +41,49 @@ F.linear(final_hidden, tied.embedding.modality_embeddings.0.embedding.weight)
 This deliberately matches the current checkpoint, where there is no separate
 `tied.head.*` tensor for audio. The fused modality embedding is the audio head.
 
+## SGLang-Omni Source Gate
+
+The branch now has a separate source-reference gate for the part of
+SGLang-Omni that is practical to import without installing the full `sglang`
+server package. It imports the real SGLang-Omni Higgs tokenizer and fused-head
+modules directly from a source checkout, regenerates the one-step reference, and
+strict-compares that output against the committed golden:
+
+```bash
+tools/higgs/run_higgs_sglang_omni_source_gate.sh \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --sglang-omni-src /data/src/sglang-omni \
+  --label a86082d
+```
+
+Validated on the 4090-D host:
+
+```text
+repo=/data/src/pegainfer
+commit=a86082d5
+label=a86082d
+sglang_omni_src=/data/src/sglang-omni
+sglang_omni_commit=c6980be8
+reference=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-sglang-omni-src-reference-a86082d.safetensors
+compare_log=/data/results/pegainfer/higgs-audio/actual/sglang-omni-src-reference-compare-a86082d.txt
+sglang_omni_direct_imports=ok
+source_reference_strict_comparison=ok
+artifacts_nonempty=ok
+```
+
+The generated reference metadata records:
+
+```text
+sglang_omni_source_dir=/data/src/sglang-omni
+sglang_omni_source_commit=c6980be8
+sglang_omni_direct_imports=text_tokenizer.py;modeling.py
+sglang_omni_full_model_imported=false
+```
+
+This closes the prompt/head-source gap for the one-step fixture. It is still not
+a full SGLang-Omni runtime parity result because `sglang_omni.models.higgs_tts.model`
+depends on the uninstalled `sglang` package in the current 4090 environment.
+
 ## Generated Artifact
 
 The fork branch carries a small derived fixture:
@@ -741,9 +784,11 @@ upstream issue update:
 - The branch commits a derived fixture from a research/non-commercial model. This
   is acceptable for a fork validation branch, but upstream needs an explicit
   maintainer decision before merging the fixture.
-- The generator uses HuggingFace Qwen3 for the backbone and SGLang-Omni semantics
-  for prompt/head logic. A later gate should compare directly against a pinned
-  SGLang-Omni execution path when the server stack is practical to run.
+- The generator uses HuggingFace Qwen3 for the backbone. Prompt/head logic is now
+  strict-checked against directly imported SGLang-Omni `text_tokenizer.py` and
+  `modeling.py`, but a later gate should still compare against a pinned full
+  SGLang-Omni execution path once the `sglang` runtime package is practical to
+  run in the 4090 environment.
 - The Rust crate does not yet have a fully Higgs-owned GPU loader. It locks the
   golden/artifact contract and can dump an actual one-step file through the
   existing Qwen3 runtime bridge, now backed by tensor-name aliases instead of a
