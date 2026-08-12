@@ -376,6 +376,21 @@ The default actual-dump path no longer requires users to pass a Qwen3 view path;
 it writes a small config-only alias view next to `--out` and loads the original
 Higgs checkpoint payload through tensor aliases:
 
+The preferred CUDA repro entrypoint is:
+
+```bash
+tools/higgs/run_higgs_one_step_cuda_gate.sh \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --label d522295
+```
+
+That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
+through the auto alias-view path, runs the semantic comparator, and records the
+small generated Qwen3 config view. Add `--profile` to capture an NSYS report for
+the same actual-dump path.
+
+The underlying actual-dump command remains:
+
 ```bash
 PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
 cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
