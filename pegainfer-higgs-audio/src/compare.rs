@@ -209,7 +209,7 @@ pub fn compare_one_step_semantic_safetensors(
 
     let max_argmax_regret = max_argmax_regret(&golden_logits, &actual_argmax)?;
     let (top64_min_overlap, top64_mean_overlap) =
-        topk_overlap_from_logits(&golden_logits, &actual_logits, 64)?;
+        topk_overlap_from_logits(&golden_logits, &actual_logits, actual_argmax.len(), 64)?;
 
     Ok(OneStepSemanticComparison {
         prompt_exact,
@@ -480,8 +480,10 @@ fn max_argmax_regret(golden_logits: &[f32], actual_argmax: &[i64]) -> Result<f32
 fn topk_overlap_from_logits(
     golden_logits: &[f32],
     actual_logits: &[f32],
+    rows: usize,
     k: usize,
 ) -> Result<(usize, f32)> {
+    ensure!(rows > 0, "top-k overlap requires at least one row");
     ensure!(k > 0, "top-k overlap requires k > 0");
     ensure!(
         golden_logits.len() == actual_logits.len(),
@@ -489,11 +491,11 @@ fn topk_overlap_from_logits(
         golden_logits.len(),
         actual_logits.len()
     );
-    let rows = 8usize;
     ensure!(
         golden_logits.len().is_multiple_of(rows),
-        "top-k overlap assumes 8 Higgs codebooks, got {} logits",
-        golden_logits.len()
+        "top-k overlap logits length {} is not divisible by rows {}",
+        golden_logits.len(),
+        rows
     );
     let vocab = golden_logits.len() / rows;
     ensure!(
@@ -689,7 +691,27 @@ mod tests {
                 });
             }
         }
-        let (min_overlap, mean_overlap) = topk_overlap_from_logits(&golden, &actual, 4).unwrap();
+        let (min_overlap, mean_overlap) = topk_overlap_from_logits(&golden, &actual, 8, 4).unwrap();
+        assert_eq!(min_overlap, 0);
+        assert_eq!(mean_overlap, 3.5);
+    }
+
+    #[test]
+    fn topk_overlap_uses_dynamic_row_count() {
+        let mut golden = Vec::new();
+        let mut actual = Vec::new();
+        for row in 0..16 {
+            for col in 0..8 {
+                golden.push((8 - col) as f32);
+                actual.push(if row < 2 {
+                    col as f32
+                } else {
+                    (8 - col) as f32
+                });
+            }
+        }
+        let (min_overlap, mean_overlap) =
+            topk_overlap_from_logits(&golden, &actual, 16, 4).unwrap();
         assert_eq!(min_overlap, 0);
         assert_eq!(mean_overlap, 3.5);
     }
