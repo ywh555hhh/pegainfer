@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail, ensure};
 use half::bf16;
 use safetensors::{Dtype, SafeTensors, tensor::TensorView};
 
-use crate::one_step_golden::validate_required_tensors;
+use crate::one_step_golden::{CODEBOOK_VOCAB_SIZE, HIDDEN_SIZE, NUM_CODEBOOKS, TOP_K};
 
 pub const PROMPT_INPUT_IDS: &str = "prompt.input_ids_padded";
 pub const PROMPT_ATTENTION_MASK: &str = "prompt.attention_mask";
@@ -146,8 +146,7 @@ pub fn compare_one_step_safetensors(
     actual: &SafeTensors,
     tolerances: OneStepTolerances,
 ) -> Result<OneStepComparison> {
-    validate_required_tensors(golden, "golden")?;
-    validate_required_tensors(actual, "actual")?;
+    validate_comparison_schema(golden, actual)?;
 
     let tensors = vec![
         compare_i64_exact(golden, actual, PROMPT_INPUT_IDS)?,
@@ -186,8 +185,7 @@ pub fn compare_one_step_semantic_safetensors(
     actual: &SafeTensors,
     tolerances: OneStepSemanticTolerances,
 ) -> Result<OneStepSemanticComparison> {
-    validate_required_tensors(golden, "golden")?;
-    validate_required_tensors(actual, "actual")?;
+    validate_comparison_schema(golden, actual)?;
 
     let prompt_exact = i64_values(tensor(golden, PROMPT_INPUT_IDS)?)?
         == i64_values(tensor(actual, PROMPT_INPUT_IDS)?)?
@@ -309,6 +307,93 @@ fn compare_f32(
         abs_tol,
         mean_abs_tol,
     )
+}
+
+fn validate_comparison_schema(golden: &SafeTensors, actual: &SafeTensors) -> Result<()> {
+    let prompt_shape = require_matching_tensor(golden, actual, PROMPT_INPUT_IDS, Dtype::I64)?;
+    ensure!(
+        prompt_shape.len() == 2,
+        "{PROMPT_INPUT_IDS} must be rank-2 [batch, seq], got {prompt_shape:?}"
+    );
+    let batch = prompt_shape[0];
+    let seq = prompt_shape[1];
+    ensure!(batch > 0, "{PROMPT_INPUT_IDS} batch must be non-zero");
+    ensure!(seq > 0, "{PROMPT_INPUT_IDS} seq must be non-zero");
+
+    let attention_shape =
+        require_matching_tensor(golden, actual, PROMPT_ATTENTION_MASK, Dtype::I64)?;
+    ensure!(
+        attention_shape == prompt_shape,
+        "{PROMPT_ATTENTION_MASK} shape {attention_shape:?} must match {PROMPT_INPUT_IDS} shape {prompt_shape:?}"
+    );
+
+    let lengths_shape = require_matching_tensor(golden, actual, PROMPT_LENGTHS, Dtype::I64)?;
+    ensure!(
+        lengths_shape == [batch],
+        "{PROMPT_LENGTHS} shape {lengths_shape:?} must be [batch={batch}]"
+    );
+
+    let hidden_shape = require_matching_tensor(golden, actual, FINAL_HIDDEN_BF16, Dtype::BF16)?;
+    ensure!(
+        hidden_shape == [batch, HIDDEN_SIZE],
+        "{FINAL_HIDDEN_BF16} shape {hidden_shape:?} must be [batch={batch}, hidden={HIDDEN_SIZE}]"
+    );
+
+    let logits_shape = require_matching_tensor(golden, actual, AUDIO_LOGITS_F32, Dtype::F32)?;
+    ensure!(
+        logits_shape == [batch, NUM_CODEBOOKS, CODEBOOK_VOCAB_SIZE],
+        "{AUDIO_LOGITS_F32} shape {logits_shape:?} must be [batch={batch}, codebooks={NUM_CODEBOOKS}, vocab={CODEBOOK_VOCAB_SIZE}]"
+    );
+
+    let top_ids_shape = require_matching_tensor(golden, actual, AUDIO_TOP64_IDS, Dtype::I64)?;
+    ensure!(
+        top_ids_shape == [batch, NUM_CODEBOOKS, TOP_K],
+        "{AUDIO_TOP64_IDS} shape {top_ids_shape:?} must be [batch={batch}, codebooks={NUM_CODEBOOKS}, top_k={TOP_K}]"
+    );
+
+    let top_logprobs_shape =
+        require_matching_tensor(golden, actual, AUDIO_TOP64_LOGPROBS_F32, Dtype::F32)?;
+    ensure!(
+        top_logprobs_shape == [batch, NUM_CODEBOOKS, TOP_K],
+        "{AUDIO_TOP64_LOGPROBS_F32} shape {top_logprobs_shape:?} must be [batch={batch}, codebooks={NUM_CODEBOOKS}, top_k={TOP_K}]"
+    );
+
+    let argmax_shape = require_matching_tensor(golden, actual, AUDIO_ARGMAX_IDS, Dtype::I64)?;
+    ensure!(
+        argmax_shape == [batch, NUM_CODEBOOKS],
+        "{AUDIO_ARGMAX_IDS} shape {argmax_shape:?} must be [batch={batch}, codebooks={NUM_CODEBOOKS}]"
+    );
+
+    Ok(())
+}
+
+fn require_matching_tensor(
+    golden: &SafeTensors,
+    actual: &SafeTensors,
+    name: &'static str,
+    dtype: Dtype,
+) -> Result<Vec<usize>> {
+    let golden = tensor(golden, name)?;
+    let actual = tensor(actual, name)?;
+    ensure!(
+        golden.dtype() == dtype,
+        "{name} golden dtype mismatch: expected {:?}, got {:?}",
+        dtype,
+        golden.dtype()
+    );
+    ensure!(
+        actual.dtype() == dtype,
+        "{name} actual dtype mismatch: expected {:?}, got {:?}",
+        dtype,
+        actual.dtype()
+    );
+    ensure!(
+        golden.shape() == actual.shape(),
+        "{name} shape mismatch: golden {:?} actual {:?}",
+        golden.shape(),
+        actual.shape()
+    );
+    Ok(golden.shape().to_vec())
 }
 
 fn compare_bf16(
@@ -591,6 +676,11 @@ fn bytes_to_chunks(bytes: &[u8], chunk: usize, dtype: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+    use std::collections::BTreeMap;
+
+    use safetensors::tensor::View;
+
     use super::*;
 
     const GOLDEN: &str = concat!(
@@ -622,6 +712,21 @@ mod tests {
         assert_eq!(comparison.logits_cosine, 1.0);
         assert_eq!(comparison.max_argmax_regret, 0.0);
         assert_eq!(comparison.top64_min_overlap, 64);
+    }
+
+    #[test]
+    fn comparison_accepts_dynamic_batch_schema() {
+        let bytes = dynamic_one_step_bytes(2, 3);
+        let st = SafeTensors::deserialize(&bytes).unwrap();
+
+        let strict = compare_one_step_safetensors(&st, &st, OneStepTolerances::default()).unwrap();
+        assert!(strict.passed());
+
+        let semantic =
+            compare_one_step_semantic_safetensors(&st, &st, OneStepSemanticTolerances::default())
+                .unwrap();
+        assert!(semantic.passed());
+        assert_eq!(semantic.top64_min_overlap, TOP_K);
     }
 
     #[test]
@@ -744,5 +849,126 @@ mod tests {
         let header: serde_json::Value = serde_json::from_slice(&bytes[8..8 + header_len]).unwrap();
         let start = header[name]["data_offsets"][0].as_u64().unwrap() as usize;
         8 + header_len + start
+    }
+
+    fn dynamic_one_step_bytes(batch: usize, seq: usize) -> Vec<u8> {
+        let rows = batch * NUM_CODEBOOKS;
+        let mut prompt = Vec::with_capacity(batch * seq);
+        let mut mask = Vec::with_capacity(batch * seq);
+        for row in 0..batch {
+            for col in 0..seq {
+                prompt.push((row * seq + col + 1) as i64);
+                mask.push(1);
+            }
+        }
+        let lengths = vec![seq as i64; batch];
+
+        let hidden: Vec<_> = (0..batch * HIDDEN_SIZE)
+            .map(|idx| bf16::from_f32((idx % 17 + 1) as f32 / 17.0))
+            .collect();
+        let mut logits = vec![0.0f32; rows * CODEBOOK_VOCAB_SIZE];
+        let mut argmax = Vec::with_capacity(rows);
+        let mut top_ids = Vec::with_capacity(rows * TOP_K);
+        let mut top_logprobs = Vec::with_capacity(rows * TOP_K);
+        for row in 0..rows {
+            let best = row % CODEBOOK_VOCAB_SIZE;
+            logits[row * CODEBOOK_VOCAB_SIZE + best] = 1.0;
+            argmax.push(best as i64);
+            for offset in 0..TOP_K {
+                top_ids.push(((best + offset) % CODEBOOK_VOCAB_SIZE) as i64);
+                top_logprobs.push(-(offset as f32));
+            }
+        }
+
+        let tensors = BTreeMap::from([
+            (
+                PROMPT_INPUT_IDS.to_string(),
+                test_i64(&[batch, seq], &prompt),
+            ),
+            (
+                PROMPT_ATTENTION_MASK.to_string(),
+                test_i64(&[batch, seq], &mask),
+            ),
+            (PROMPT_LENGTHS.to_string(), test_i64(&[batch], &lengths)),
+            (
+                FINAL_HIDDEN_BF16.to_string(),
+                test_bf16(&[batch, HIDDEN_SIZE], &hidden),
+            ),
+            (
+                AUDIO_LOGITS_F32.to_string(),
+                test_f32(&[batch, NUM_CODEBOOKS, CODEBOOK_VOCAB_SIZE], &logits),
+            ),
+            (
+                AUDIO_TOP64_IDS.to_string(),
+                test_i64(&[batch, NUM_CODEBOOKS, TOP_K], &top_ids),
+            ),
+            (
+                AUDIO_TOP64_LOGPROBS_F32.to_string(),
+                test_f32(&[batch, NUM_CODEBOOKS, TOP_K], &top_logprobs),
+            ),
+            (
+                AUDIO_ARGMAX_IDS.to_string(),
+                test_i64(&[batch, NUM_CODEBOOKS], &argmax),
+            ),
+        ]);
+        safetensors::serialize(tensors, None).unwrap()
+    }
+
+    #[derive(Clone)]
+    struct TestTensor {
+        dtype: Dtype,
+        shape: Vec<usize>,
+        data: Vec<u8>,
+    }
+
+    impl View for TestTensor {
+        fn dtype(&self) -> Dtype {
+            self.dtype
+        }
+
+        fn shape(&self) -> &[usize] {
+            &self.shape
+        }
+
+        fn data(&self) -> Cow<'_, [u8]> {
+            Cow::Borrowed(&self.data)
+        }
+
+        fn data_len(&self) -> usize {
+            self.data.len()
+        }
+    }
+
+    fn test_i64(shape: &[usize], values: &[i64]) -> TestTensor {
+        TestTensor {
+            dtype: Dtype::I64,
+            shape: shape.to_vec(),
+            data: values
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect(),
+        }
+    }
+
+    fn test_f32(shape: &[usize], values: &[f32]) -> TestTensor {
+        TestTensor {
+            dtype: Dtype::F32,
+            shape: shape.to_vec(),
+            data: values
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect(),
+        }
+    }
+
+    fn test_bf16(shape: &[usize], values: &[bf16]) -> TestTensor {
+        TestTensor {
+            dtype: Dtype::BF16,
+            shape: shape.to_vec(),
+            data: values
+                .iter()
+                .flat_map(|value| value.to_bits().to_le_bytes())
+                .collect(),
+        }
     }
 }
