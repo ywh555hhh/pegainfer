@@ -428,8 +428,10 @@ through the auto alias-view path, runs the semantic comparator, smoke-tests the
 prompt-only retained KV session path, compares that session actual against the
 same golden, asserts the persisted gate markers, verifies the generated files are
 non-empty, writes a key-value gate summary, and records the small generated Qwen3
-config view. Add `--profile` to capture an NSYS report for the same actual-dump
-path.
+config view. It then parses that summary with
+`tools/higgs/check_higgs_gate_summary.py` to verify the required keys, `ok`
+markers, SM/NVCC settings, and non-empty artifact paths. Add `--profile` to
+capture an NSYS report for the same actual-dump path.
 
 The script was validated on the 4090-D host at `c9a839a` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate

@@ -204,6 +204,13 @@ SUMMARY
 require_nonempty_file "$gate_summary"
 echo "==> Gate summary"
 cat "$gate_summary"
+python3 "$repo_root/tools/higgs/check_higgs_gate_summary.py" "$gate_summary" \
+  --expected-label "$label" \
+  --expected-sm "$PEGAINFER_CUDA_SM" \
+  --expected-nvcc-jobs "$PEGAINFER_NVCC_JOBS" \
+  --expected-model-dir "$model_dir" \
+  --expected-golden "$golden" \
+  --check-files
 
 if [[ "$profile" -eq 1 ]]; then
   if ! command -v nsys >/dev/null 2>&1; then
