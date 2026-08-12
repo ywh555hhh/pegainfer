@@ -813,7 +813,8 @@ upstream issue update:
   parity with exact 8-codebook argmax, zero argmax regret, hidden cosine
   `0.999990821`, and logits cosine `0.999997616`.
 - Kept the committed one-prompt fixture contract strict while allowing the
-  comparator schema to validate same-shape multi-prompt golden/actual pairs.
+  comparator schema to validate same-shape multi-prompt golden/actual pairs,
+  including prompt length and attention-mask consistency.
 - Added layer-hidden and layer-0 stage diagnostics. Layer 0 is now within the
   mean drift threshold, while strict parity remains open because bf16/runtime
   drift accumulates across 36 Qwen3 layers.
@@ -836,7 +837,8 @@ upstream issue update:
   in the next parity slice after loader/backbone code exists; the comparator
   schema is already separated from the fixed fixture contract so same-shape
   multi-prompt golden/actual files can be compared without changing the
-  committed one-prompt artifact check.
+  committed one-prompt artifact check. It also checks prompt lengths and binary
+  attention-mask sums before comparing logits.
 - The Qwen3 body smoke and auto alias-backed actual dump prove that Higgs `body.*`
   tensors can be loaded and executed by the existing Qwen3 runtime without
   rewriting the checkpoint payload. The actual dump now uses the real golden

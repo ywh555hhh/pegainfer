@@ -332,6 +332,8 @@ fn validate_comparison_schema(golden: &SafeTensors, actual: &SafeTensors) -> Res
         lengths_shape == [batch],
         "{PROMPT_LENGTHS} shape {lengths_shape:?} must be [batch={batch}]"
     );
+    validate_prompt_surface(golden, "golden", batch, seq)?;
+    validate_prompt_surface(actual, "actual", batch, seq)?;
 
     let hidden_shape = require_matching_tensor(golden, actual, FINAL_HIDDEN_BF16, Dtype::BF16)?;
     ensure!(
@@ -394,6 +396,48 @@ fn require_matching_tensor(
         actual.shape()
     );
     Ok(golden.shape().to_vec())
+}
+
+fn validate_prompt_surface(st: &SafeTensors, label: &str, batch: usize, seq: usize) -> Result<()> {
+    let lengths = i64_values(tensor(st, PROMPT_LENGTHS)?)?;
+    ensure!(
+        lengths.len() == batch,
+        "{label} prompt lengths element count {} must equal batch {batch}",
+        lengths.len()
+    );
+    let attention = i64_values(tensor(st, PROMPT_ATTENTION_MASK)?)?;
+    ensure!(
+        attention.len() == batch * seq,
+        "{label} attention mask element count {} must equal batch*seq {}",
+        attention.len(),
+        batch * seq
+    );
+
+    for (row_idx, length) in lengths.iter().enumerate() {
+        ensure!(
+            *length > 0,
+            "{label} prompt length at row {row_idx} must be positive, got {length}"
+        );
+        ensure!(
+            (*length as usize) <= seq,
+            "{label} prompt length at row {row_idx} exceeds seq {seq}: {length}"
+        );
+        let row = &attention[row_idx * seq..(row_idx + 1) * seq];
+        let mut mask_sum = 0i64;
+        for (col_idx, value) in row.iter().enumerate() {
+            ensure!(
+                *value == 0 || *value == 1,
+                "{label} attention mask at row {row_idx} col {col_idx} must be 0/1, got {value}"
+            );
+            mask_sum += *value;
+        }
+        ensure!(
+            mask_sum == *length,
+            "{label} attention mask sum at row {row_idx} must equal prompt length {length}, got {mask_sum}"
+        );
+    }
+
+    Ok(())
 }
 
 fn compare_bf16(
@@ -727,6 +771,34 @@ mod tests {
                 .unwrap();
         assert!(semantic.passed());
         assert_eq!(semantic.top64_min_overlap, TOP_K);
+    }
+
+    #[test]
+    fn comparison_rejects_prompt_length_out_of_range() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut bytes = std::fs::read(GOLDEN).unwrap();
+        let first_length = tensor_data_offset(&bytes, PROMPT_LENGTHS);
+        bytes[first_length..first_length + 8].copy_from_slice(&11i64.to_le_bytes());
+        std::fs::write(tmp.path(), bytes).unwrap();
+
+        let err = compare_one_step_files(GOLDEN, tmp.path(), OneStepTolerances::default())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("actual prompt length at row 0 exceeds seq 10"));
+    }
+
+    #[test]
+    fn comparison_rejects_attention_mask_length_mismatch() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut bytes = std::fs::read(GOLDEN).unwrap();
+        let first_mask = tensor_data_offset(&bytes, PROMPT_ATTENTION_MASK);
+        bytes[first_mask..first_mask + 8].copy_from_slice(&0i64.to_le_bytes());
+        std::fs::write(tmp.path(), bytes).unwrap();
+
+        let err = compare_one_step_files(GOLDEN, tmp.path(), OneStepTolerances::default())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("actual attention mask sum at row 0"));
     }
 
     #[test]
