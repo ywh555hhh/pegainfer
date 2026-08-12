@@ -24,7 +24,7 @@ from safetensors.torch import save_file
 from tokenizers import Tokenizer
 from transformers import PreTrainedTokenizerFast
 from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
-from transformers.models.qwen3.modeling_qwen3 import Qwen3Model
+from transformers.models.qwen3.modeling_qwen3 import Qwen3Model, Qwen3RotaryEmbedding
 
 AUDIO_PLACEHOLDER_ID = -100
 REQUIRED_SPECIALS = ("<|tts|>", "<|ref_audio|>", "<|text|>", "<|audio|>")
@@ -95,6 +95,9 @@ def load_backbone(model_file: Path, text_cfg: dict[str, Any], device: str) -> Qw
     with torch.device("meta"):
         model = Qwen3Model(cfg)
     model.to_empty(device=device)
+    # to_empty() does not populate non-persistent RoPE buffers created on the
+    # meta device, so rebuild rotary_emb on the real device before loading params.
+    model.rotary_emb = Qwen3RotaryEmbedding(cfg, device=device)
     model.to(dtype=torch.bfloat16)
     model.eval()
     params = dict(model.named_parameters())
