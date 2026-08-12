@@ -66,7 +66,9 @@ sglang_omni_src=/data/src/sglang-omni
 sglang_omni_commit=c6980be8
 reference=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-sglang-omni-src-reference-a86082d.safetensors
 compare_log=/data/results/pegainfer/higgs-audio/actual/sglang-omni-src-reference-compare-a86082d.txt
+readiness_log=/data/results/pegainfer/higgs-audio/actual/sglang-omni-import-readiness-a86082d.txt
 sglang_omni_direct_imports=ok
+sglang_omni_full_model_import=missing_sglang
 source_reference_strict_comparison=ok
 artifacts_nonempty=ok
 ```

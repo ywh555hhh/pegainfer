@@ -25,6 +25,7 @@ Optional:
 Outputs:
   <result-root>/actual/higgs-one-step-sglang-omni-src-reference-<label>.safetensors
   <result-root>/actual/sglang-omni-src-reference-compare-<label>.txt
+  <result-root>/actual/sglang-omni-import-readiness-<label>.txt
   <result-root>/actual/higgs-sglang-omni-source-gate-<label>.txt
 USAGE
 }
@@ -107,6 +108,7 @@ require_nonempty_file() {
 actual_dir="$result_root/actual"
 reference="$actual_dir/higgs-one-step-sglang-omni-src-reference-$label.safetensors"
 compare_log="$actual_dir/sglang-omni-src-reference-compare-$label.txt"
+readiness_log="$actual_dir/sglang-omni-import-readiness-$label.txt"
 gate_summary="$actual_dir/higgs-sglang-omni-source-gate-$label.txt"
 
 mkdir -p "$actual_dir"
@@ -120,10 +122,18 @@ echo "sglang_omni_src:  $sglang_omni_src"
 echo "golden:           $golden"
 echo "reference:        $reference"
 echo "compare_log:      $compare_log"
+echo "readiness_log:    $readiness_log"
 echo "summary:          $gate_summary"
 echo "device:           $device"
 
 python3 -m py_compile tools/accuracy/dump_higgs_one_step_golden.py
+python3 -m py_compile tools/higgs/check_higgs_sglang_omni_imports.py
+
+python3 tools/higgs/check_higgs_sglang_omni_imports.py \
+  --sglang-omni-src "$sglang_omni_src" \
+  --require-direct | tee "$readiness_log"
+grep -q "^direct_higgs_imports=ok$" "$readiness_log"
+require_nonempty_file "$readiness_log"
 
 python3 tools/accuracy/dump_higgs_one_step_golden.py \
   --snapshot-dir "$model_dir" \
@@ -165,6 +175,7 @@ PY
 cat "$metadata_tmp"
 
 sglang_omni_commit="$(grep '^sglang_omni_source_commit=' "$metadata_tmp" | cut -d= -f2-)"
+full_model_import="$(grep '^full_higgs_model_import=' "$readiness_log" | cut -d= -f2-)"
 cat >"$gate_summary" <<SUMMARY
 status=ok
 repo=$repo_root
@@ -176,7 +187,9 @@ sglang_omni_commit=$sglang_omni_commit
 golden=$golden
 reference=$reference
 compare_log=$compare_log
+readiness_log=$readiness_log
 sglang_omni_direct_imports=ok
+sglang_omni_full_model_import=$full_model_import
 source_reference_strict_comparison=ok
 artifacts_nonempty=ok
 SUMMARY
