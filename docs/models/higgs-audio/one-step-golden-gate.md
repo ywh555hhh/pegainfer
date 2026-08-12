@@ -158,6 +158,12 @@ runtime (`CUDA + cuBLAS + FlashInfer`) through tensor-name aliases, while
 not claim a Higgs decode/KV-cache phase yet; that belongs to the next runtime
 slice once prefill/decode continuation is owned by the Higgs crate.
 
+The one-step audio head now has a reusable `OneStepAudioPrediction` boundary:
+CPU and CUDA bf16 paths both compute logits/top-k/argmax first, and the
+safetensors writer consumes that prediction as a separate step. This keeps the
+golden dump path intact while making the next runtime slice less file-output
+centric.
+
 ## Qwen3 Runtime Bridge
 
 The sixth slice originally added a bridge materializer that rewrites the single
@@ -617,6 +623,8 @@ upstream issue update:
   checkpoint without a 7.5 GiB renamed copy.
 - Added a Higgs kernel plan descriptor covering artifact, prefill, and golden
   phases so reviewers can see the current backend/runtime boundary explicitly.
+- Split one-step audio prediction from safetensors writing so future decode or
+  serving paths can reuse logits/top-k/argmax without going through a dump file.
 - Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
   loader; the suspected CUDA RoPE failure was a false-positive.
 - Added strict and semantic comparison modes. Corrected 4090 run passes semantic

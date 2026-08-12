@@ -46,7 +46,7 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
                 },
                 KernelOp {
                     id: "fused_audio_head",
-                    rust: "one_step_actual::write_one_step_actual_with_gpu_audio_head -> ops::linear",
+                    rust: "one_step_actual::compute_one_step_audio_prediction_gpu_bf16 -> ops::linear",
                     backend: "CUDA bf16 linear",
                     notes: "projects the final hidden state with tied.embedding.modality_embeddings.0.embedding.weight into 8x1026 audio logits",
                 },

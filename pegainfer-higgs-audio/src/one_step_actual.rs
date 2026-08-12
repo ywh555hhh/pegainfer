@@ -57,6 +57,14 @@ pub struct OneStepActualSummary {
     pub audio_logits: usize,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct OneStepAudioPrediction {
+    pub logits: Vec<f32>,
+    pub top_ids: Vec<i64>,
+    pub top_logprobs: Vec<f32>,
+    pub argmax: Vec<i64>,
+}
+
 #[derive(Clone)]
 pub(crate) struct OwnedTensor {
     dtype: Dtype,
@@ -136,29 +144,79 @@ pub fn write_one_step_actual(
     final_hidden: &[bf16],
     audio_head: &[bf16],
 ) -> Result<OneStepActualSummary> {
+    let prediction = compute_one_step_audio_prediction(final_hidden, audio_head)?;
+    write_one_step_actual_prediction(output_path, prompt, final_hidden, &prediction)
+}
+
+pub fn compute_one_step_audio_prediction(
+    final_hidden: &[bf16],
+    audio_head: &[bf16],
+) -> Result<OneStepAudioPrediction> {
+    validate_audio_head_inputs(final_hidden, audio_head)?;
+    let logits = audio_logits_cpu(final_hidden, audio_head);
+    Ok(OneStepAudioPrediction::from_logits(logits))
+}
+
+pub fn write_one_step_actual_prediction(
+    output_path: impl AsRef<Path>,
+    prompt: &PromptTensors,
+    final_hidden: &[bf16],
+    prediction: &OneStepAudioPrediction,
+) -> Result<OneStepActualSummary> {
     ensure!(
         final_hidden.len() == HIDDEN_SIZE,
         "final hidden len mismatch: expected {HIDDEN_SIZE}, got {}",
         final_hidden.len()
     );
-    ensure!(
-        audio_head.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
-        "audio head len mismatch: expected {}, got {}",
-        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
-        audio_head.len()
-    );
-
-    let logits = audio_logits(final_hidden, audio_head);
-    let (top_ids, top_logprobs, argmax) = audio_topk_and_argmax(&logits);
+    prediction.validate()?;
     write_one_step_actual_tensors(
         output_path,
         prompt,
         final_hidden,
-        &logits,
-        &top_ids,
-        &top_logprobs,
-        &argmax,
+        &prediction.logits,
+        &prediction.top_ids,
+        &prediction.top_logprobs,
+        &prediction.argmax,
     )
+}
+
+impl OneStepAudioPrediction {
+    pub fn from_logits(logits: Vec<f32>) -> Self {
+        let (top_ids, top_logprobs, argmax) = audio_topk_and_argmax(&logits);
+        Self {
+            logits,
+            top_ids,
+            top_logprobs,
+            argmax,
+        }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        ensure!(
+            self.logits.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE,
+            "audio logits len mismatch: expected {}, got {}",
+            NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE,
+            self.logits.len()
+        );
+        ensure!(
+            self.top_ids.len() == NUM_CODEBOOKS * TOP_K,
+            "top id len mismatch: expected {}, got {}",
+            NUM_CODEBOOKS * TOP_K,
+            self.top_ids.len()
+        );
+        ensure!(
+            self.top_logprobs.len() == NUM_CODEBOOKS * TOP_K,
+            "top logprob len mismatch: expected {}, got {}",
+            NUM_CODEBOOKS * TOP_K,
+            self.top_logprobs.len()
+        );
+        ensure!(
+            self.argmax.len() == NUM_CODEBOOKS,
+            "argmax len mismatch: expected {NUM_CODEBOOKS}, got {}",
+            self.argmax.len()
+        );
+        Ok(())
+    }
 }
 
 #[cfg(feature = "runtime-qwen3")]
@@ -169,29 +227,20 @@ pub fn write_one_step_actual_with_gpu_audio_head(
     audio_head: &[bf16],
     device_ordinal: usize,
 ) -> Result<OneStepActualSummary> {
-    ensure!(
-        final_hidden.len() == HIDDEN_SIZE,
-        "final hidden len mismatch: expected {HIDDEN_SIZE}, got {}",
-        final_hidden.len()
-    );
-    ensure!(
-        audio_head.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
-        "audio head len mismatch: expected {}, got {}",
-        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
-        audio_head.len()
-    );
+    let prediction =
+        compute_one_step_audio_prediction_gpu_bf16(final_hidden, audio_head, device_ordinal)?;
+    write_one_step_actual_prediction(output_path, prompt, final_hidden, &prediction)
+}
 
+#[cfg(feature = "runtime-qwen3")]
+pub fn compute_one_step_audio_prediction_gpu_bf16(
+    final_hidden: &[bf16],
+    audio_head: &[bf16],
+    device_ordinal: usize,
+) -> Result<OneStepAudioPrediction> {
+    validate_audio_head_inputs(final_hidden, audio_head)?;
     let logits = audio_logits_gpu_bf16(final_hidden, audio_head, device_ordinal)?;
-    let (top_ids, top_logprobs, argmax) = audio_topk_and_argmax(&logits);
-    write_one_step_actual_tensors(
-        output_path,
-        prompt,
-        final_hidden,
-        &logits,
-        &top_ids,
-        &top_logprobs,
-        &argmax,
-    )
+    Ok(OneStepAudioPrediction::from_logits(logits))
 }
 
 #[cfg(feature = "runtime-qwen3")]
@@ -304,7 +353,22 @@ fn write_one_step_actual_tensors(
     })
 }
 
-fn audio_logits(final_hidden: &[bf16], audio_head: &[bf16]) -> Vec<f32> {
+fn validate_audio_head_inputs(final_hidden: &[bf16], audio_head: &[bf16]) -> Result<()> {
+    ensure!(
+        final_hidden.len() == HIDDEN_SIZE,
+        "final hidden len mismatch: expected {HIDDEN_SIZE}, got {}",
+        final_hidden.len()
+    );
+    ensure!(
+        audio_head.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
+        "audio head len mismatch: expected {}, got {}",
+        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
+        audio_head.len()
+    );
+    Ok(())
+}
+
+fn audio_logits_cpu(final_hidden: &[bf16], audio_head: &[bf16]) -> Vec<f32> {
     let hidden: Vec<f32> = final_hidden.iter().map(|value| value.to_f32()).collect();
     audio_head
         .chunks_exact(HIDDEN_SIZE)
@@ -449,6 +513,38 @@ mod tests {
             .err()
             .map(|err| err.to_string());
         assert_eq!(err, None);
+    }
+
+    #[test]
+    fn audio_prediction_is_reusable_before_writing() {
+        let hidden = vec![bf16::from_f32(1.0); HIDDEN_SIZE];
+        let mut head = vec![bf16::from_f32(0.0); NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE];
+        for codebook in 0..NUM_CODEBOOKS {
+            let row = codebook * CODEBOOK_VOCAB_SIZE + codebook;
+            head[row * HIDDEN_SIZE] = bf16::from_f32(1.0);
+        }
+
+        let prediction = compute_one_step_audio_prediction(&hidden, &head).unwrap();
+
+        prediction.validate().unwrap();
+        assert_eq!(prediction.logits.len(), NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE);
+        assert_eq!(
+            prediction.argmax,
+            (0..NUM_CODEBOOKS as i64).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn audio_prediction_validates_shape_contract() {
+        let prediction = OneStepAudioPrediction {
+            logits: vec![0.0; NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE - 1],
+            top_ids: vec![0; NUM_CODEBOOKS * TOP_K],
+            top_logprobs: vec![0.0; NUM_CODEBOOKS * TOP_K],
+            argmax: vec![0; NUM_CODEBOOKS],
+        };
+
+        let error = prediction.validate().unwrap_err().to_string();
+        assert!(error.contains("audio logits len mismatch"));
     }
 
     #[test]
