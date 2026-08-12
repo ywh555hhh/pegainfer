@@ -99,6 +99,46 @@ depend on them:
 - The expected KV footprint is 144 KiB per position, or 1152 MiB for 8192
   positions in bf16.
 
+## 4090 Bring-Up Notes
+
+The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
+`1611334a` on branch `feat/higgs-audio-one-step-golden`.
+
+Static model/golden validation passed on the 4090 host with the Python reference
+environment:
+
+```text
+golden_sha256 a9c23650c0e9a39ee2b314f1dead7c7d2fd8adfe77c312b198b6e2e6b3d91471
+config_sha256 match=True
+tokenizer_json_sha256 match=True
+model_index_sha256 match=True
+model_type higgs_multimodal_qwen3
+arch HiggsMultimodalQwen3ForConditionalGeneration
+text_layers 36
+hidden 2560
+audio_codebooks 8
+audio_vocab 1026
+body_tensors 397
+total_tensors 927
+```
+
+Environment notes:
+
+- GPU is RTX 4090 D, driver 570.124.06, 24564 MiB VRAM.
+- Rust nightly is installed under `/root/.cargo/bin`, observed as
+  `rustc 1.99.0-nightly`.
+- Cargo uses `rsproxy.cn` sparse registry for crates.io.
+- Direct `git clone --filter=blob:none --no-checkout
+  https://github.com/vllm-project/vllm.git` failed with GitHub transfer too
+  slow.
+- `https://gh-proxy.com/https://github.com/vllm-project/vllm.git` passed
+  `git ls-remote HEAD`, and a scoped `git config --global url.<proxy>.insteadOf`
+  was installed for the vLLM URL only.
+- Even after that, workspace-level `cargo test -p pegainfer-higgs-audio` still
+  spent more than five minutes updating the vLLM git dependency. Treat this as a
+  workspace dependency isolation/cache issue, not a Higgs crate correctness
+  failure.
+
 ## Technical Debt
 
 - The branch commits a derived fixture from a research/non-commercial model. This
@@ -116,9 +156,9 @@ depend on them:
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
 - Remote Rust execution can still be blocked by workspace-level git dependencies
-  such as `vllm-project/vllm.git`; when that happens, run local Rust gates and
-  keep remote checks focused on Python fixture/model-hash validation until the
-  mirror/cache policy is fixed.
+  such as `vllm-project/vllm.git`; `gh-proxy.com` is usable for `ls-remote` on
+  the 4090 host, but full Cargo fetch still needs either a prewarmed cache or
+  workspace dependency isolation.
 
 ## Next Execution Slice
 
