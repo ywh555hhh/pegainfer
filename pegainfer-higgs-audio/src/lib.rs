@@ -7,6 +7,7 @@
 
 pub mod compare;
 pub mod config;
+pub mod kernel_plan;
 pub mod layer_dump;
 pub mod load_plan;
 pub mod materialize_qwen3;
@@ -16,3 +17,5 @@ pub mod one_step_golden;
 pub mod runtime_bridge;
 pub mod runtime_source;
 pub mod weights;
+
+pub use kernel_plan::kernel_plan;

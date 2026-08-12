@@ -140,6 +140,24 @@ single fused Higgs audio head. It can now produce the Qwen3 requested-name to
 Higgs stored-name alias map consumed by the runtime bridge, so the body weights
 can be read from the original checkpoint without materializing a renamed copy.
 
+## Kernel Plan
+
+`pegainfer-higgs-audio` now exports `kernel_plan()`, matching the review style
+used by `pegainfer-qwen3-4b`. The descriptor is deliberately scoped to the
+runtime surface that exists today:
+
+- `artifact`: checkpoint header validation and Qwen3 tensor-alias planning.
+- `prefill`: Qwen3-backed Higgs body prefill, CUDA bf16 fused audio head, and
+  CPU top-k/argmax extraction for the diagnostic one-step gate.
+- `golden`: strict tensor comparison and semantic runtime comparison.
+
+The plan records that `qwen3_body_prefill` is served by the existing Qwen3
+runtime (`CUDA + cuBLAS + FlashInfer`) through tensor-name aliases, while
+`fused_audio_head` is a CUDA bf16 linear over
+`tied.embedding.modality_embeddings.0.embedding.weight`. It intentionally does
+not claim a Higgs decode/KV-cache phase yet; that belongs to the next runtime
+slice once prefill/decode continuation is owned by the Higgs crate.
+
 ## Qwen3 Runtime Bridge
 
 The sixth slice originally added a bridge materializer that rewrites the single
@@ -597,6 +615,8 @@ upstream issue update:
 - Added a Higgs-owned one-step runtime bridge over the Qwen3 executor, backed by
   tensor-name aliases so Higgs body weights load directly from the original
   checkpoint without a 7.5 GiB renamed copy.
+- Added a Higgs kernel plan descriptor covering artifact, prefill, and golden
+  phases so reviewers can see the current backend/runtime boundary explicitly.
 - Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
   loader; the suspected CUDA RoPE failure was a false-positive.
 - Added strict and semantic comparison modes. Corrected 4090 run passes semantic
