@@ -241,13 +241,14 @@ pub fn ensure_semantic_comparison_passed(comparison: &OneStepSemanticComparison)
         return Ok(());
     }
     bail!(
-        "Higgs one-step semantic comparison failed: prompt_exact={} argmax_exact={} hidden_cosine={:.9} logits_cosine={:.9} max_argmax_regret={:.6} top64_min_overlap={}",
+        "Higgs one-step semantic comparison failed: prompt_exact={} argmax_exact={} hidden_cosine={:.9} logits_cosine={:.9} max_argmax_regret={:.6} top64_min_overlap={} top64_mean_overlap={:.2}",
         comparison.prompt_exact,
         comparison.audio_argmax_exact,
         comparison.hidden_cosine,
         comparison.logits_cosine,
         comparison.max_argmax_regret,
-        comparison.top64_min_overlap
+        comparison.top64_min_overlap,
+        comparison.top64_mean_overlap
     );
 }
 
@@ -643,6 +644,35 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("argmax_exact=false"));
+    }
+
+    #[test]
+    fn semantic_comparator_rejects_prompt_mismatch() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut bytes = std::fs::read(GOLDEN).unwrap();
+        let first_prompt_id = tensor_data_offset(&bytes, PROMPT_INPUT_IDS);
+        let original = i64::from_le_bytes(
+            bytes[first_prompt_id..first_prompt_id + 8]
+                .try_into()
+                .unwrap(),
+        );
+        bytes[first_prompt_id..first_prompt_id + 8].copy_from_slice(&(original + 1).to_le_bytes());
+        std::fs::write(tmp.path(), bytes).unwrap();
+
+        let comparison = compare_one_step_semantic_files(
+            GOLDEN,
+            tmp.path(),
+            OneStepSemanticTolerances::default(),
+        )
+        .unwrap();
+        assert!(!comparison.prompt_exact);
+        assert!(comparison.audio_argmax_exact);
+        assert!(!comparison.passed());
+        let err = ensure_semantic_comparison_passed(&comparison)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("prompt_exact=false"));
+        assert!(err.contains("top64_mean_overlap="));
     }
 
     #[test]
