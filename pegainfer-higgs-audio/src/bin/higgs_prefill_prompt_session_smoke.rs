@@ -6,7 +6,7 @@ use pegainfer_higgs_audio::one_step_actual::{
     load_prompt_from_golden, write_one_step_actual_prediction,
 };
 use pegainfer_higgs_audio::runtime_bridge::{
-    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsOneStepRuntime, HiggsRuntimeSource,
+    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsAudioRuntime, HiggsRuntimeSource,
 };
 use pegainfer_higgs_audio::runtime_source::{Qwen3RuntimeSourcePath, select_qwen3_runtime_source};
 use pegainfer_qwen3_4b::runtime::RequestId;
@@ -65,7 +65,7 @@ fn main() -> Result<()> {
 
     let prompt = load_prompt_from_golden(&args.golden)?;
     let prompt_ids = prompt.prompt_ids()?;
-    let mut runtime = HiggsOneStepRuntime::from_model_dir(
+    let mut runtime = HiggsAudioRuntime::from_model_dir(
         &args.model_dir,
         source,
         args.audio_head_backend.into(),

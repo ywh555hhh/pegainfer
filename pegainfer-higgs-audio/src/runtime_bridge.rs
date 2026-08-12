@@ -28,7 +28,12 @@ pub enum HiggsRuntimeSource<'a> {
     AutoConfigAlias { qwen3_config_dir: &'a Path },
 }
 
-pub struct HiggsOneStepRuntime {
+/// Higgs Audio runtime surface backed by the existing Qwen3 executor.
+///
+/// The current implementation owns prefill and prompt-session smoke paths. Full
+/// audio decode continuation is intentionally not exposed until the Higgs crate
+/// owns the audio-codebook feedback semantics.
+pub struct HiggsAudioRuntime {
     executor: Qwen3Executor,
     audio_head: Vec<bf16>,
     audio_head_backend: AudioHeadBackend,
@@ -36,11 +41,17 @@ pub struct HiggsOneStepRuntime {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct HiggsOneStepPrefill {
+pub struct HiggsAudioPrefill {
     pub prompt_tokens: usize,
     pub final_hidden_bf16: Vec<bf16>,
     pub audio: OneStepAudioPrediction,
 }
+
+/// Compatibility alias for early one-step gate callers.
+pub type HiggsOneStepRuntime = HiggsAudioRuntime;
+
+/// Compatibility alias for early one-step gate callers.
+pub type HiggsOneStepPrefill = HiggsAudioPrefill;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HiggsPromptSessionPrefill {
@@ -50,7 +61,7 @@ pub struct HiggsPromptSessionPrefill {
     pub audio: OneStepAudioPrediction,
 }
 
-impl HiggsOneStepRuntime {
+impl HiggsAudioRuntime {
     pub fn from_model_dir(
         model_dir: impl AsRef<Path>,
         source: HiggsRuntimeSource<'_>,
@@ -82,7 +93,7 @@ impl HiggsOneStepRuntime {
     pub fn prefill_audio_from_prompt(
         &mut self,
         prompt: &PromptTensors,
-    ) -> Result<HiggsOneStepPrefill> {
+    ) -> Result<HiggsAudioPrefill> {
         let prompt_ids = prompt.prompt_ids()?;
         self.prefill_audio_from_prompt_ids(&prompt_ids)
     }
@@ -90,7 +101,7 @@ impl HiggsOneStepRuntime {
     pub fn prefill_audio_from_prompt_ids(
         &mut self,
         prompt_ids: &[u32],
-    ) -> Result<HiggsOneStepPrefill> {
+    ) -> Result<HiggsAudioPrefill> {
         let hidden = self
             .executor
             .prefill_last_hidden_bf16(prompt_ids.to_vec())?
@@ -105,7 +116,7 @@ impl HiggsOneStepRuntime {
                 compute_one_step_audio_prediction(&hidden, &self.audio_head)?
             }
         };
-        Ok(HiggsOneStepPrefill {
+        Ok(HiggsAudioPrefill {
             prompt_tokens: prompt_ids.len(),
             final_hidden_bf16: hidden,
             audio,

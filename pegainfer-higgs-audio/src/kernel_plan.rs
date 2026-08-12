@@ -40,13 +40,13 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
             ops: &[
                 KernelOp {
                     id: "qwen3_body_prefill",
-                    rust: "runtime_bridge::HiggsOneStepRuntime::prefill_audio_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16",
+                    rust: "runtime_bridge::HiggsAudioRuntime::prefill_audio_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16",
                     backend: "Qwen3 runtime: CUDA + cuBLAS + FlashInfer",
                     notes: "runs the Higgs text/body checkpoint through the existing Qwen3 prefill path via tensor-name aliases",
                 },
                 KernelOp {
                     id: "qwen3_prompt_session_prefill",
-                    rust: "runtime_bridge::HiggsOneStepRuntime::prefill_prompt_session_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16_retained_prompt",
+                    rust: "runtime_bridge::HiggsAudioRuntime::prefill_prompt_session_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16_retained_prompt",
                     backend: "Qwen3 runtime: CUDA + cuBLAS + FlashInfer + paged KV",
                     notes: "retains prompt KV under a request id without registering a generated text token",
                 },

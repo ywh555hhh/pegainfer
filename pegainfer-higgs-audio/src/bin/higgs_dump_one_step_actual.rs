@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use pegainfer_higgs_audio::runtime_bridge::{
-    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsOneStepRuntime, HiggsRuntimeSource,
+    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsAudioRuntime, HiggsRuntimeSource,
 };
 use pegainfer_higgs_audio::runtime_source::{Qwen3RuntimeSourcePath, select_qwen3_runtime_source};
 
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
             HiggsRuntimeSource::AutoConfigAlias { qwen3_config_dir }
         }
     };
-    let mut runtime = HiggsOneStepRuntime::from_model_dir(
+    let mut runtime = HiggsAudioRuntime::from_model_dir(
         &args.model_dir,
         source,
         args.audio_head_backend.into(),

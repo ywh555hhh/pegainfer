@@ -164,9 +164,9 @@ safetensors writer consumes that prediction as a separate step. This keeps the
 golden dump path intact while making the next runtime slice less file-output
 centric.
 
-`HiggsOneStepRuntime` now exposes `prefill_audio_from_prompt_ids`, which runs a
+`HiggsAudioRuntime` now exposes `prefill_audio_from_prompt_ids`, which runs a
 raw token prompt through the aliased Qwen3 body and returns
-`HiggsOneStepPrefill { prompt_tokens, final_hidden_bf16, audio }`. The golden
+`HiggsAudioPrefill { prompt_tokens, final_hidden_bf16, audio }`. The golden
 dump path loads prompt tensors from the fixture and then calls this runtime API;
 it is no longer the only way to obtain Higgs audio logits from the bridge. This
 is still a one-shot diagnostic prefill path, not a retained KV-cache session.
