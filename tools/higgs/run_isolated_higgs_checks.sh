@@ -29,6 +29,81 @@ rm -f "$tmp_root/pegainfer-higgs-audio/src/bin/higgs_dump_layer0_stages.rs"
 mkdir -p "$tmp_root/test_data"
 cp "$repo_root/test_data/higgs-one-step-audio-logits.safetensors" "$tmp_root/test_data/"
 
+python3 -m py_compile \
+  "$repo_root/tools/higgs/check_higgs_gate_summary.py" \
+  "$repo_root/tools/higgs/check_higgs_sglang_omni_imports.py" \
+  "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py"
+
+summary_tmp="$tmp_root/summary-checks"
+mkdir -p "$summary_tmp/auto-view"
+printf '%s' 'x' >"$summary_tmp/golden.safetensors"
+printf '%s' 'x' >"$summary_tmp/actual.safetensors"
+printf '%s' 'x' >"$summary_tmp/session-actual.safetensors"
+printf '%s\n' 'higgs one-step strict comparison: ok' >"$summary_tmp/source-compare.txt"
+printf '%s\n' \
+  'direct_higgs_imports=ok' \
+  'full_higgs_model_import=missing_sglang' \
+  >"$summary_tmp/readiness.txt"
+printf '%s' 'x' >"$summary_tmp/session-smoke.txt"
+printf '%s' 'x' >"$summary_tmp/semantic-compare.txt"
+printf '%s' 'x' >"$summary_tmp/session-semantic-compare.txt"
+printf '%s' 'x' >"$summary_tmp/auto-view/config.json"
+printf '%s' 'x' >"$summary_tmp/auto-view/generation_config.json"
+printf '%s' 'x' >"$summary_tmp/auto-view/higgs-qwen3-tensor-aliases.json"
+
+printf '%s\n' \
+  'status=ok' \
+  "repo=$repo_root" \
+  'commit=isolated' \
+  'label=isolated' \
+  'model_dir=/models/higgs' \
+  "golden=$summary_tmp/golden.safetensors" \
+  'sm=89' \
+  'nvcc_jobs=8' \
+  "actual=$summary_tmp/actual.safetensors" \
+  "session_actual=$summary_tmp/session-actual.safetensors" \
+  "compare_log=$summary_tmp/semantic-compare.txt" \
+  "session_smoke_log=$summary_tmp/session-smoke.txt" \
+  "session_compare_log=$summary_tmp/session-semantic-compare.txt" \
+  "auto_view=$summary_tmp/auto-view" \
+  'semantic_comparison=ok' \
+  'session_semantic_comparison=ok' \
+  'duplicate_request_id_guard=ok' \
+  'artifacts_nonempty=ok' \
+  >"$summary_tmp/cuda-gate.txt"
+python3 "$repo_root/tools/higgs/check_higgs_gate_summary.py" "$summary_tmp/cuda-gate.txt" \
+  --expected-label isolated \
+  --expected-sm 89 \
+  --expected-nvcc-jobs 8 \
+  --expected-model-dir /models/higgs \
+  --expected-golden "$summary_tmp/golden.safetensors" \
+  --check-files
+
+printf '%s\n' \
+  'status=ok' \
+  "repo=$repo_root" \
+  'commit=isolated' \
+  'label=isolated' \
+  'model_dir=/models/higgs' \
+  'sglang_omni_src=/src/sglang-omni' \
+  'sglang_omni_commit=abc1234' \
+  "golden=$summary_tmp/golden.safetensors" \
+  "reference=$summary_tmp/actual.safetensors" \
+  "compare_log=$summary_tmp/source-compare.txt" \
+  "readiness_log=$summary_tmp/readiness.txt" \
+  'sglang_omni_direct_imports=ok' \
+  'sglang_omni_full_model_import=missing_sglang' \
+  'source_reference_strict_comparison=ok' \
+  'artifacts_nonempty=ok' \
+  >"$summary_tmp/source-gate.txt"
+python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py" "$summary_tmp/source-gate.txt" \
+  --expected-label isolated \
+  --expected-model-dir /models/higgs \
+  --expected-sglang-omni-src /src/sglang-omni \
+  --expected-sglang-omni-commit abc1234 \
+  --expected-golden "$summary_tmp/golden.safetensors" \
+  --check-files
+
 cat >"$tmp_root/Cargo.toml" <<'TOML'
 [workspace]
 resolver = "3"

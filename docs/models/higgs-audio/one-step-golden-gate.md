@@ -363,9 +363,10 @@ tools/higgs/run_isolated_higgs_checks.sh
 ```
 
 That script builds a temporary one-member workspace containing only
-`pegainfer-higgs-audio` and the committed fixture, then runs fmt, unit tests, and
-`higgs_compare_one_step` self-comparison. It is a workaround for dependency
-isolation only; it does not replace full workspace CI.
+`pegainfer-higgs-audio` and the committed fixture, compiles the Higgs gate
+summary validators, checks synthetic CUDA/source-gate summaries, then runs fmt,
+unit tests, and `higgs_compare_one_step` self-comparison. It is a workaround for
+dependency isolation only; it does not replace full workspace CI.
 
 ## 4090 Bring-Up Notes
 
