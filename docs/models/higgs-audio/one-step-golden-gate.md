@@ -343,6 +343,32 @@ FusedAddRMSNormRoundKernel: 1.4%
 AppendPagedKVCacheKernel: 0.6%
 ```
 
+An NSYS profile for the Higgs-owned one-step actual dump was captured after the
+auto alias-view path landed:
+
+```text
+/data/results/pegainfer/higgs-audio/profiles/higgs-one-step-actual-auto-a8652dc.nsys-rep
+profile size: 145 KiB
+profiled actual: /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-a8652dc-profiled.safetensors
+profiled actual size: 44 KiB
+semantic comparison: ok
+```
+
+The `nsys stats --report cuda_gpu_kern_sum` summary shows the one-step path is
+dominated by bf16 projection GEMMs, with FlashInfer prefill and small custom
+kernels contributing much less GPU kernel time:
+
+```text
+CUTLASS bf16 GEMM 16x16x128x2: 53.8% GPU kernel time, 180 launches
+CUTLASS bf16 GEMM 16x16x128x1: 40.5% GPU kernel time, 72 launches
+FlashInfer BatchPrefillWithPagedKVCacheKernel: 1.6%, 36 launches
+prefill_qk_norm_rope_kernel: 0.7%, 36 launches
+FusedAddRMSNormRoundKernel: 0.7%, 36 launches
+FlashInfer RMSNormKernel: 0.7%, 37 launches
+AppendPagedKVCacheKernel: 0.6%, 36 launches
+silu_mul_kernel: 0.5%, 36 launches
+```
+
 ## Runtime Actual Dump
 
 The current branch also has a Higgs-owned one-step runtime bridge over the Qwen3 executor.
