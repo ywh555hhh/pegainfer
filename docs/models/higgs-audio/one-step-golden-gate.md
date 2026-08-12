@@ -420,6 +420,51 @@ higgs one-step semantic comparison:
 higgs one-step semantic comparison: ok
 ```
 
+## Layer Drift Diagnostic
+
+The branch now includes a layer-hidden diagnostic loop for the strict drift root
+cause:
+
+```bash
+/data/venvs/ai-infra/bin/python tools/accuracy/dump_higgs_layer_hidden_golden.py \
+  --snapshot-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --out /data/results/pegainfer/higgs-audio/layer-drift/higgs-layer-hidden-golden.safetensors
+
+PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
+cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
+  --bin higgs_dump_prefill_layer_hidden -- \
+  --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
+  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
+  --out /data/results/pegainfer/higgs-audio/layer-drift/higgs-layer-hidden-actual.safetensors
+
+/data/venvs/ai-infra/bin/python tools/accuracy/compare_higgs_layer_hidden.py \
+  --golden /data/results/pegainfer/higgs-audio/layer-drift/higgs-layer-hidden-golden.safetensors \
+  --actual /data/results/pegainfer/higgs-audio/layer-drift/higgs-layer-hidden-actual.safetensors
+```
+
+The 4090 run produced this key attribution:
+
+```text
+prompt_exact=True
+embedding.last_hidden.bf16   max_abs=0.000000 mean_abs=0.000000 p99_abs=0.000000 rmse=0.000000 cosine=1.000000358
+layer.00.last_hidden.bf16    max_abs=1.000000 mean_abs=0.051948 p99_abs=0.250000 rmse=0.074880 cosine=0.999494791
+layer.09.last_hidden.bf16    max_abs=26.000000 mean_abs=0.940940 p99_abs=3.006405 rmse=1.334986 cosine=0.992176890
+layer.35.last_hidden.bf16    max_abs=128.000000 mean_abs=7.269177 p99_abs=24.000000 rmse=9.608499 cosine=0.999773741
+final_hidden.bf16            max_abs=0.500000 mean_abs=0.044455 p99_abs=0.152792 rmse=0.059135 cosine=0.999898791
+summary:
+  first_mean_abs_gt_0.003000=layer.00.last_hidden.bf16
+  first_cosine_lt_0.999800000=layer.00.last_hidden.bf16
+  worst_mean_abs=layer.35.last_hidden.bf16:7.269177
+  worst_cosine=layer.09.last_hidden.bf16:0.992176890
+```
+
+This rules out prompt construction, tokenizer ids, embedding load, and Qwen3 body
+view aliasing as the source of the remaining strict drift. The first measurable
+divergence appears inside layer 0 after an exact embedding boundary. The next
+root-cause slice should instrument layer 0 internals: input RMSNorm, q/k/v
+projection slices, q/k RMSNorm + RoPE, prefill attention output, o projection,
+post-attention RMSNorm, and MLP down projection.
+
 NCU is installed (`2025.1.0.0`) but cannot collect GPU performance counters on
 this host:
 
@@ -479,12 +524,13 @@ Environment notes:
 
 ## Next Execution Slice
 
-1. Run `higgs_compare_one_step --mode semantic` on the 4090 CUDA bf16 actual
-   dump and record the exact output in this document.
-2. Diagnose the remaining Qwen3-body hidden drift by comparing the Higgs prompt
-   against a Transformers dump at intermediate layer boundaries.
-3. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
+1. Instrument layer 0 internals now that embedding parity is exact and the
+   first drift appears after the first transformer block.
+2. Compare layer-0 input RMSNorm, q/k/v projection slices, q/k RMSNorm + RoPE,
+   prefill attention output, o projection, post-attention RMSNorm, and MLP down
+   projection against HF hooks.
+3. Fix the first divergent primitive before widening the strict one-step
+   tolerance.
+4. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
    the safetensors payload.
-4. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
-   fixture with calibrated bf16 tolerances.
 5. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
