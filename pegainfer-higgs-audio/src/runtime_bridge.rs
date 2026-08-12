@@ -53,9 +53,41 @@ pub type HiggsOneStepRuntime = HiggsAudioRuntime;
 /// Compatibility alias for early one-step gate callers.
 pub type HiggsOneStepPrefill = HiggsAudioPrefill;
 
+/// Higgs-owned handle for a retained prompt KV session.
+///
+/// The backing executor currently stores the session under a Qwen3 request id,
+/// but callers should treat this as a Higgs Audio session id. Audio-codebook
+/// continuation is intentionally not exposed through this handle yet.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct HiggsPromptSession {
+    request_id: RequestId,
+}
+
+impl HiggsPromptSession {
+    pub fn new(id: u64) -> Self {
+        Self {
+            request_id: RequestId::new(id),
+        }
+    }
+
+    pub fn id(self) -> u64 {
+        self.request_id.get()
+    }
+
+    fn request_id(self) -> RequestId {
+        self.request_id
+    }
+}
+
+impl From<RequestId> for HiggsPromptSession {
+    fn from(request_id: RequestId) -> Self {
+        Self { request_id }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HiggsPromptSessionPrefill {
-    pub request_id: RequestId,
+    pub session: HiggsPromptSession,
     pub prompt_tokens: usize,
     pub final_hidden_bf16: Vec<bf16>,
     pub audio: OneStepAudioPrediction,
@@ -128,9 +160,17 @@ impl HiggsAudioRuntime {
         request_id: RequestId,
         prompt_ids: &[u32],
     ) -> Result<HiggsPromptSessionPrefill> {
+        self.prefill_prompt_session(request_id.into(), prompt_ids)
+    }
+
+    pub fn prefill_prompt_session(
+        &mut self,
+        session: HiggsPromptSession,
+        prompt_ids: &[u32],
+    ) -> Result<HiggsPromptSessionPrefill> {
         let retained = self
             .executor
-            .prefill_last_hidden_bf16_retained_prompt(request_id, prompt_ids.to_vec())?;
+            .prefill_last_hidden_bf16_retained_prompt(session.request_id(), prompt_ids.to_vec())?;
         let audio = match self.audio_head_backend {
             AudioHeadBackend::CudaBf16 => compute_one_step_audio_prediction_gpu_bf16(
                 &retained.hidden_bf16,
@@ -142,15 +182,15 @@ impl HiggsAudioRuntime {
             }
         };
         Ok(HiggsPromptSessionPrefill {
-            request_id: retained.request_id,
+            session: retained.request_id.into(),
             prompt_tokens: prompt_ids.len(),
             final_hidden_bf16: retained.hidden_bf16,
             audio,
         })
     }
 
-    pub fn drop_prompt_session(&mut self, request_id: RequestId) -> Result<()> {
-        self.executor.drop_request(request_id)
+    pub fn drop_prompt_session(&mut self, session: impl Into<HiggsPromptSession>) -> Result<()> {
+        self.executor.drop_request(session.into().request_id())
     }
 }
 

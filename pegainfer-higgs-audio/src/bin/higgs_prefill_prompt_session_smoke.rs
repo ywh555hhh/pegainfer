@@ -6,10 +6,10 @@ use pegainfer_higgs_audio::one_step_actual::{
     load_prompt_from_golden, write_one_step_actual_prediction,
 };
 use pegainfer_higgs_audio::runtime_bridge::{
-    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsAudioRuntime, HiggsRuntimeSource,
+    AudioHeadBackend as RuntimeAudioHeadBackend, HiggsAudioRuntime, HiggsPromptSession,
+    HiggsRuntimeSource,
 };
 use pegainfer_higgs_audio::runtime_source::{Qwen3RuntimeSourcePath, select_qwen3_runtime_source};
-use pegainfer_qwen3_4b::runtime::RequestId;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum AudioHeadBackend {
@@ -71,15 +71,15 @@ fn main() -> Result<()> {
         args.audio_head_backend.into(),
         args.device_ordinal,
     )?;
-    let request_id = RequestId::new(args.request_id);
-    let session = runtime.prefill_prompt_session_from_prompt_ids(request_id, &prompt_ids)?;
+    let session_handle = HiggsPromptSession::new(args.request_id);
+    let session = runtime.prefill_prompt_session(session_handle, &prompt_ids)?;
     if runtime
-        .prefill_prompt_session_from_prompt_ids(request_id, &prompt_ids)
+        .prefill_prompt_session(session_handle, &prompt_ids)
         .is_ok()
     {
         bail!(
             "duplicate Higgs prompt-session prefill unexpectedly replaced request_id={}",
-            request_id.get()
+            session_handle.id()
         );
     }
     let summary = write_one_step_actual_prediction(
@@ -88,10 +88,10 @@ fn main() -> Result<()> {
         &session.final_hidden_bf16,
         &session.audio,
     )?;
-    runtime.drop_prompt_session(request_id)?;
+    runtime.drop_prompt_session(session_handle)?;
 
     println!("higgs prompt-session prefill smoke: ok");
-    println!("  request_id: {}", session.request_id.get());
+    println!("  request_id: {}", session.session.id());
     println!("  duplicate_request_id_guard: ok");
     println!("  out: {}", summary.output_path.display());
     println!("  audio_head_backend: {:?}", args.audio_head_backend);

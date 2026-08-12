@@ -46,9 +46,9 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
                 },
                 KernelOp {
                     id: "qwen3_prompt_session_prefill",
-                    rust: "runtime_bridge::HiggsAudioRuntime::prefill_prompt_session_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16_retained_prompt",
+                    rust: "runtime_bridge::HiggsAudioRuntime::prefill_prompt_session -> Qwen3Executor::prefill_last_hidden_bf16_retained_prompt",
                     backend: "Qwen3 runtime: CUDA + cuBLAS + FlashInfer + paged KV",
-                    notes: "retains prompt KV under a request id without registering a generated text token",
+                    notes: "retains prompt KV under a Higgs-owned session handle without registering a generated text token",
                 },
                 KernelOp {
                     id: "fused_audio_head",

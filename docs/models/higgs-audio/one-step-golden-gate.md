@@ -171,13 +171,14 @@ dump path loads prompt tensors from the fixture and then calls this runtime API;
 it is no longer the only way to obtain Higgs audio logits from the bridge. This
 is still a one-shot diagnostic prefill path, not a retained KV-cache session.
 
-The next bridge slice adds `prefill_prompt_session_from_prompt_ids(request_id,
-prompt_ids)`. It uses a new Qwen3 `prefill_last_hidden_bf16_retained_prompt`
-entrypoint and commits prompt KV with `max_output_tokens = 0`, so no generated
-text token is registered. This is intentionally narrower than full decode
-continuation: it proves Higgs can own a request id and prompt KV lifecycle, while
-avoiding the incorrect shortcut of feeding Higgs audio-codebook ids into Qwen3's
-text-token decode state.
+The next bridge slice adds a Higgs-owned prompt session surface:
+`prefill_prompt_session(HiggsPromptSession::new(id), prompt_ids)`. It uses a new
+Qwen3 `prefill_last_hidden_bf16_retained_prompt` entrypoint internally and
+commits prompt KV with `max_output_tokens = 0`, so no generated text token is
+registered. This is intentionally narrower than full decode continuation: it
+proves Higgs can own a prompt KV lifecycle without exposing Qwen3's `RequestId`
+as the primary API, while avoiding the incorrect shortcut of feeding Higgs
+audio-codebook ids into Qwen3's text-token decode state.
 
 ## Qwen3 Runtime Bridge
 
