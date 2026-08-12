@@ -73,6 +73,11 @@ source_reference_strict_comparison=ok
 artifacts_nonempty=ok
 ```
 
+The script writes a key-value summary and validates it with
+`tools/higgs/check_higgs_sglang_omni_source_gate_summary.py`, including required
+keys, strict-compare/readiness markers, expected source commit, and non-empty
+artifact paths.
+
 The generated reference metadata records:
 
 ```text

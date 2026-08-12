@@ -128,6 +128,7 @@ echo "device:           $device"
 
 python3 -m py_compile tools/accuracy/dump_higgs_one_step_golden.py
 python3 -m py_compile tools/higgs/check_higgs_sglang_omni_imports.py
+python3 -m py_compile tools/higgs/check_higgs_sglang_omni_source_gate_summary.py
 
 python3 tools/higgs/check_higgs_sglang_omni_imports.py \
   --sglang-omni-src "$sglang_omni_src" \
@@ -198,4 +199,11 @@ require_nonempty_file "$gate_summary"
 
 echo "==> Gate summary"
 cat "$gate_summary"
+python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py" "$gate_summary" \
+  --expected-label "$label" \
+  --expected-model-dir "$model_dir" \
+  --expected-sglang-omni-src "$sglang_omni_src" \
+  --expected-sglang-omni-commit "$sglang_omni_commit" \
+  --expected-golden "$golden" \
+  --check-files
 echo "==> Higgs SGLang-Omni source-reference gate: ok"
