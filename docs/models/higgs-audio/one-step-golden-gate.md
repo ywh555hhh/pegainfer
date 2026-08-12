@@ -99,6 +99,50 @@ depend on them:
 - The expected KV footprint is 144 KiB per position, or 1152 MiB for 8192
   positions in bf16.
 
+## Comparison Gate
+
+The third slice defines the actual runtime parity contract:
+
+```bash
+cargo run -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
+  --golden test_data/higgs-one-step-audio-logits.safetensors \
+  --actual /path/to/pegainfer-higgs-one-step-actual.safetensors
+```
+
+The expected actual file uses the same tensor schema as the golden:
+
+- prompt tensors and audio argmax/top-k ids are exact-match gates
+- `final_hidden.bf16` is compared with max/mean absolute drift
+- `audio_logits.f32` is compared with max/mean absolute drift
+- `audio_top64.logprobs.f32` is compared with max/mean absolute drift
+
+Initial tolerances are intentionally explicit and CLI-overridable:
+
+```text
+hidden_abs_tol=0.03125
+hidden_mean_abs_tol=0.003
+logits_abs_tol=0.05
+logits_mean_abs_tol=0.005
+top_logprobs_abs_tol=0.05
+top_logprobs_mean_abs_tol=0.005
+```
+
+These are not a substitute for runtime calibration. They are the current
+engineering boundary for the first actual-vs-golden gate; tighten or widen them
+only after a measured PegaInfer dump exists and the drift source is understood.
+
+When workspace-level git dependencies block the full root workspace on remote
+hosts, run the Higgs-only isolated gate:
+
+```bash
+tools/higgs/run_isolated_higgs_checks.sh
+```
+
+That script builds a temporary one-member workspace containing only
+`pegainfer-higgs-audio` and the committed fixture, then runs fmt, unit tests, and
+`higgs_compare_one_step` self-comparison. It is a workaround for dependency
+isolation only; it does not replace full workspace CI.
+
 ## 4090 Bring-Up Notes
 
 The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
@@ -152,7 +196,8 @@ Environment notes:
 - The fixture covers one prompt. Wider prompt-length coverage belongs in the next
   parity slice after loader/backbone code exists.
 - The generator captures `final_hidden.bf16`, but the first Rust test does not
-  compare PegaInfer hidden states yet.
+  compare PegaInfer hidden states yet; the comparator now defines the check, but
+  no PegaInfer runtime dump exists yet.
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
 - Remote Rust execution can still be blocked by workspace-level git dependencies
@@ -166,6 +211,8 @@ Environment notes:
 2. Load the pinned checkpoint's `body.*`, text embedding, and fused modality
    embedding/head.
 3. Reuse the current Qwen3 backbone operator path for zero-shot prefill.
-4. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
+4. Dump PegaInfer `final_hidden.bf16`, `[8, 1026]` audio logits, top-64
+   logprobs, and argmax ids into the comparator schema.
+5. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
    fixture with calibrated bf16 tolerances.
-5. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
+6. Only after that, add delay-pattern, sampling, KV decode, and codec gates.

@@ -77,7 +77,7 @@ pub fn load_and_validate(path: impl AsRef<Path>) -> Result<GoldenContract> {
     let metadata = safetensors_metadata(&bytes)?;
     validate_metadata(&metadata)?;
     let st = SafeTensors::deserialize(&bytes).context("parse Higgs golden safetensors")?;
-    validate_tensors(&st)?;
+    validate_required_tensors(&st, "golden")?;
     Ok(GoldenContract {
         metadata,
         sha256,
@@ -118,14 +118,14 @@ fn validate_metadata(metadata: &HashMap<String, String>) -> Result<()> {
     Ok(())
 }
 
-fn validate_tensors(st: &SafeTensors) -> Result<()> {
+pub fn validate_required_tensors(st: &SafeTensors, label: &str) -> Result<()> {
     for spec in REQUIRED_TENSORS {
         let tensor = st
             .tensor(spec.name)
-            .with_context(|| format!("golden missing tensor {}", spec.name))?;
+            .with_context(|| format!("{label} missing tensor {}", spec.name))?;
         if tensor.dtype() != spec.dtype {
             bail!(
-                "golden tensor {} dtype mismatch: expected {:?}, got {:?}",
+                "{label} tensor {} dtype mismatch: expected {:?}, got {:?}",
                 spec.name,
                 spec.dtype,
                 tensor.dtype()
@@ -133,7 +133,7 @@ fn validate_tensors(st: &SafeTensors) -> Result<()> {
         }
         if tensor.shape() != spec.shape {
             bail!(
-                "golden tensor {} shape mismatch: expected {:?}, got {:?}",
+                "{label} tensor {} shape mismatch: expected {:?}, got {:?}",
                 spec.name,
                 spec.shape,
                 tensor.shape()
