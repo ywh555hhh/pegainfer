@@ -171,7 +171,7 @@ isolation only; it does not replace full workspace CI.
 ## 4090 Bring-Up Notes
 
 The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
-`1611334a` on branch `feat/higgs-audio-one-step-golden`.
+`156878f5` on branch `feat/higgs-audio-one-step-golden`.
 
 Static model/golden validation passed on the 4090 host with the Python reference
 environment:
@@ -189,6 +189,16 @@ audio_codebooks 8
 audio_vocab 1026
 body_tensors 397
 total_tensors 927
+```
+
+The Rust isolated Higgs gate and the real checkpoint header gate also passed on
+the 4090 host:
+
+```text
+isolated Higgs tests: 10 passed
+higgs_compare_one_step self-comparison: ok
+higgs_artifact_check: ok
+checkpoint headers: files=1 tensors=399 bf16=399
 ```
 
 Environment notes:
