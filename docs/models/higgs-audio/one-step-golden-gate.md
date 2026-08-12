@@ -431,12 +431,13 @@ to capture an NSYS report for the same actual-dump path.
 
 The script was validated on the 4090-D host at `d94624b` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, and duplicate
-request-id guard landed, producing both expected actual files:
+request-id guard landed, producing the complete gate artifact set:
 
 ```text
 actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-d94624b.safetensors
 session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-d94624b.safetensors
 compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-d94624b.txt
+smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-d94624b.txt
 session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-d94624b.txt
 semantic comparison: ok
 session semantic comparison: ok

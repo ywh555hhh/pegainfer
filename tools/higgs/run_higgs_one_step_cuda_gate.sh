@@ -21,7 +21,10 @@ Optional:
 
 Outputs:
   <result-root>/actual/higgs-one-step-actual-cuda-bf16-auto-<label>.safetensors
+  <result-root>/actual/higgs-one-step-session-cuda-bf16-auto-<label>.safetensors
   <result-root>/actual/semantic-compare-auto-<label>.txt
+  <result-root>/actual/higgs-prompt-session-smoke-<label>.txt
+  <result-root>/actual/semantic-compare-session-auto-<label>.txt
   <result-root>/actual/higgs-qwen3-config-view/
   <result-root>/profiles/higgs-one-step-actual-auto-<label>.nsys-rep when --profile is set
 USAGE
@@ -99,6 +102,7 @@ profile_dir="$result_root/profiles"
 actual="$actual_dir/higgs-one-step-actual-cuda-bf16-auto-$label.safetensors"
 session_actual="$actual_dir/higgs-one-step-session-cuda-bf16-auto-$label.safetensors"
 compare_log="$actual_dir/semantic-compare-auto-$label.txt"
+session_smoke_log="$actual_dir/higgs-prompt-session-smoke-$label.txt"
 session_compare_log="$actual_dir/semantic-compare-session-auto-$label.txt"
 auto_view="$actual_dir/higgs-qwen3-config-view"
 
@@ -116,6 +120,8 @@ echo "golden:      $golden"
 echo "actual:      $actual"
 echo "session:     $session_actual"
 echo "compare_log: $compare_log"
+echo "smoke_log:   $session_smoke_log"
+echo "session_log: $session_compare_log"
 echo "sm:          $PEGAINFER_CUDA_SM"
 echo "nvcc_jobs:   $PEGAINFER_NVCC_JOBS"
 
@@ -142,7 +148,7 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --bin higgs_prefill_prompt_session_smoke -- \
   --model-dir "$model_dir" \
   --golden "$golden" \
-  --out "$session_actual"
+  --out "$session_actual" | tee "$session_smoke_log"
 
 echo "==> Running session semantic comparison"
 cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
