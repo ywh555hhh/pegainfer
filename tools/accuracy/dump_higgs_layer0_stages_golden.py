@@ -126,7 +126,6 @@ def main() -> None:
     if q_norm_all is None or k_norm_all is None:
         raise RuntimeError("missing q/k norm snapshots")
     position_ids = torch.arange(max_len, device=args.device).unsqueeze(0)
-    cos, sin = backbone.rotary_emb(input_ids, position_ids)
 
     def norm_to_bhsd(name: str, tensor: torch.Tensor) -> torch.Tensor:
         if tensor.ndim != 4:
@@ -139,6 +138,7 @@ def main() -> None:
 
     q_norm_bhsd = norm_to_bhsd("q_norm", q_norm_all)
     k_norm_bhsd = norm_to_bhsd("k_norm", k_norm_all)
+    cos, sin = backbone.rotary_emb(q_norm_bhsd, position_ids)
     stages["layer0.q_norm.bf16"] = last_token(
         q_norm_bhsd.transpose(1, 2).reshape(len(prompt_ids), max_len, -1),
         row_idx,
