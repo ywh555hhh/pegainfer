@@ -413,11 +413,12 @@ through the auto alias-view path, runs the semantic comparator, and records the
 small generated Qwen3 config view. Add `--profile` to capture an NSYS report for
 the same actual-dump path.
 
-The script was validated on the 4090-D host at `f607edb` and produced:
+The script was validated on the 4090-D host at `fd92856` after the
+`OneStepAudioPrediction` split and produced:
 
 ```text
-actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-f607edb.safetensors
-compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-f607edb.txt
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-fd92856.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-fd92856.txt
 semantic comparison: ok
 auto view:
   config.json 306 bytes
