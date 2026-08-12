@@ -420,7 +420,7 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label ec775ca
+  --label 6b7cbbd
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
@@ -430,18 +430,18 @@ same golden, asserts the persisted gate markers, verifies the generated files ar
 non-empty, and records the small generated Qwen3 config view. Add `--profile`
 to capture an NSYS report for the same actual-dump path.
 
-The script was validated on the 4090-D host at `ec775ca` after the retained
+The script was validated on the 4090-D host at `6b7cbbd` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
 request-id guard, persisted session-smoke log, explicit persisted-marker
 assertions, and non-empty artifact assertions landed, producing the complete gate
 artifact set:
 
 ```text
-actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-ec775ca.safetensors
-session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-ec775ca.safetensors
-compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-ec775ca.txt
-smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-ec775ca.txt
-session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-ec775ca.txt
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-6b7cbbd.safetensors
+session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-6b7cbbd.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-6b7cbbd.txt
+smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-6b7cbbd.txt
+session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-6b7cbbd.txt
 semantic comparison: ok
 session semantic comparison: ok
 duplicate_request_id_guard: ok
