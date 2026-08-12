@@ -150,7 +150,11 @@ fn materialize_safetensors_alias(
             }),
         );
     }
-    let header_bytes = serde_json::to_vec(&Value::Object(header)).context("serialize header")?;
+    let mut header_bytes =
+        serde_json::to_vec(&Value::Object(header)).context("serialize header")?;
+    while !(8 + header_bytes.len()).is_multiple_of(std::mem::align_of::<half::bf16>()) {
+        header_bytes.push(b' ');
+    }
     let mut output = std::fs::File::create(output_path)
         .with_context(|| format!("create {}", output_path.display()))?;
     output
@@ -314,6 +318,8 @@ mod tests {
         materialize_safetensors_alias(&source, &out, &refs).unwrap();
 
         let bytes = std::fs::read(out).unwrap();
+        let header_len = u64::from_le_bytes(bytes[..8].try_into().unwrap()) as usize;
+        assert_eq!((8 + header_len) % std::mem::align_of::<half::bf16>(), 0);
         let tensors = safetensors::SafeTensors::deserialize(&bytes).unwrap();
         assert_eq!(tensors.names().len(), 3);
         assert_eq!(
