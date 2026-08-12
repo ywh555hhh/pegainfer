@@ -250,6 +250,12 @@ dump path loads prompt tensors from the fixture and then calls this runtime API;
 it is no longer the only way to obtain Higgs audio logits from the bridge. This
 is still a one-shot diagnostic prefill path, not a retained KV-cache session.
 
+The runtime prompt surface is still intentionally single-prompt: `PromptTensors::prompt_ids`
+rejects multi-row `prompt.lengths`, non-binary attention masks, and mask sums that
+do not match the recorded prompt length. Wider fixtures should use the comparator
+schema first, then add an explicitly batched runtime surface instead of slipping
+through the one-step path.
+
 The next bridge slice adds a Higgs-owned prompt session surface:
 `prefill_prompt_session(HiggsPromptSession::new(id), prompt_ids)`. It uses a new
 Qwen3 `prefill_last_hidden_bf16_retained_prompt` entrypoint internally and
@@ -814,7 +820,8 @@ upstream issue update:
   `0.999990821`, and logits cosine `0.999997616`.
 - Kept the committed one-prompt fixture contract strict while allowing the
   comparator schema to validate same-shape multi-prompt golden/actual pairs,
-  including prompt length and attention-mask consistency.
+  including prompt length and attention-mask consistency; the one-step runtime
+  prompt API remains explicitly single-prompt.
 - Added layer-hidden and layer-0 stage diagnostics. Layer 0 is now within the
   mean drift threshold, while strict parity remains open because bf16/runtime
   drift accumulates across 36 Qwen3 layers.

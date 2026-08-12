@@ -28,6 +28,17 @@ pub struct PromptTensors {
 
 impl PromptTensors {
     pub fn prompt_ids(&self) -> Result<Vec<u32>> {
+        ensure!(
+            self.lengths.len() == 1,
+            "one-step runtime prompt expects exactly one prompt length, got {}",
+            self.lengths.len()
+        );
+        ensure!(
+            self.attention_mask.len() == self.input_ids_padded.len(),
+            "attention mask len {} must match padded ids len {}",
+            self.attention_mask.len(),
+            self.input_ids_padded.len()
+        );
         let len = usize::try_from(
             *self
                 .lengths
@@ -39,6 +50,19 @@ impl PromptTensors {
             len <= self.input_ids_padded.len(),
             "prompt length {len} exceeds padded ids length {}",
             self.input_ids_padded.len()
+        );
+        ensure!(len > 0, "prompt length must be positive");
+        let mut mask_sum = 0i64;
+        for (idx, value) in self.attention_mask.iter().enumerate() {
+            ensure!(
+                *value == 0 || *value == 1,
+                "attention mask at index {idx} must be 0/1, got {value}"
+            );
+            mask_sum += *value;
+        }
+        ensure!(
+            mask_sum == len as i64,
+            "attention mask sum {mask_sum} must match prompt length {len}"
         );
         self.input_ids_padded[..len]
             .iter()
@@ -492,6 +516,39 @@ mod tests {
             lengths: vec![3],
         };
         assert_eq!(prompt.prompt_ids().unwrap(), vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn prompt_ids_reject_multi_prompt_surface() {
+        let prompt = PromptTensors {
+            input_ids_padded: vec![10, 20, 30, 40],
+            attention_mask: vec![1, 1, 1, 1],
+            lengths: vec![2, 2],
+        };
+        let err = prompt.prompt_ids().unwrap_err().to_string();
+        assert!(err.contains("expects exactly one prompt length"));
+    }
+
+    #[test]
+    fn prompt_ids_reject_attention_mask_sum_mismatch() {
+        let prompt = PromptTensors {
+            input_ids_padded: vec![10, 20, 30, 0],
+            attention_mask: vec![1, 1, 0, 0],
+            lengths: vec![3],
+        };
+        let err = prompt.prompt_ids().unwrap_err().to_string();
+        assert!(err.contains("attention mask sum 2 must match prompt length 3"));
+    }
+
+    #[test]
+    fn prompt_ids_reject_non_binary_attention_mask() {
+        let prompt = PromptTensors {
+            input_ids_padded: vec![10, 20, 30, 0],
+            attention_mask: vec![1, 2, 0, 0],
+            lengths: vec![3],
+        };
+        let err = prompt.prompt_ids().unwrap_err().to_string();
+        assert!(err.contains("attention mask at index 1 must be 0/1"));
     }
 
     #[test]
