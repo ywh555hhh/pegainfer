@@ -253,6 +253,34 @@ fn prefill_view_covers_target_seq_len() {
 }
 
 #[test]
+fn prompt_only_prefill_retains_kv_without_generated_token() {
+    let mgr = make_manager(10);
+    let before = mgr.available_blocks();
+    let mut req = mgr.new_request(vec![3; 10], 0, None);
+
+    req.schedule_prefill(10, &mgr)
+        .expect("prompt-only prefill schedule");
+    let view = req.prefill_view(10);
+    assert_eq!(view.seq_len(), 10);
+    assert_eq!(view.num_pages(), 1);
+    assert_eq!(view.last_page_len(), 10);
+
+    req.apply_prefill_without_generated(&mgr)
+        .expect("prompt-only prefill apply");
+    assert_eq!(req.kv_position(), 10);
+    assert_eq!(req.generated_tokens(), 0);
+    assert!(req.is_complete());
+    assert_eq!(mgr.available_blocks(), before - 1);
+    assert!(
+        req.schedule_decode(&mgr).is_err(),
+        "prompt-only request must not enter text-token decode"
+    );
+
+    req.release().expect("prompt-only release");
+    assert_eq!(mgr.available_blocks(), before);
+}
+
+#[test]
 fn lora_salt_isolates_prefix_cache() {
     let mgr = make_manager(32);
     let prompt = vec![7u32; 48]; // 3 full blocks
