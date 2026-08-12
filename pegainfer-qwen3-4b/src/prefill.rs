@@ -610,6 +610,59 @@ impl Qwen3Model {
             last_token_idx,
         )?;
 
+        let mut q_norm_debug = HiddenStates {
+            data: bufs
+                .q_batch
+                .data
+                .try_clone()
+                .map_err(|e| anyhow::anyhow!("D2D q norm debug clone failed: {e}"))?,
+            hidden_dim: bufs.q_batch.hidden_dim,
+            seq_len: bufs.q_batch.seq_len,
+        };
+        let mut k_norm_debug = HiddenStates {
+            data: bufs
+                .k_batch
+                .data
+                .try_clone()
+                .map_err(|e| anyhow::anyhow!("D2D k norm debug clone failed: {e}"))?,
+            hidden_dim: bufs.k_batch.hidden_dim,
+            seq_len: bufs.k_batch.seq_len,
+        };
+        let zero_positions = vec![0i32; total_tokens];
+        let zero_positions_d = self
+            .ctx
+            .stream
+            .clone_htod(&zero_positions)
+            .map_err(|e| anyhow::anyhow!("H2D q/k norm debug positions failed: {e}"))?;
+        ops::qk_norm_rope_batch_decode_into(
+            &self.ctx,
+            &mut q_norm_debug,
+            &mut k_norm_debug,
+            &layer.attention.q_norm,
+            &layer.attention.k_norm,
+            &self.cos_cache,
+            &self.sin_cache,
+            &zero_positions_d,
+            num_heads,
+            num_kv_heads,
+            head_dim,
+            self.config.rms_norm_eps,
+        );
+        push_stage(
+            &mut stages,
+            "layer0.q_norm.bf16",
+            &self.ctx,
+            &q_norm_debug,
+            last_token_idx,
+        )?;
+        push_stage(
+            &mut stages,
+            "layer0.k_norm.bf16",
+            &self.ctx,
+            &k_norm_debug,
+            last_token_idx,
+        )?;
+
         ops::prefill_attention_paged_into(
             &self.ctx,
             &mut bufs.q_batch,
