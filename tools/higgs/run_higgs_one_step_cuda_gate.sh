@@ -97,6 +97,14 @@ if [[ ! -f "$golden" ]]; then
   exit 1
 fi
 
+require_nonempty_file() {
+  local path="$1"
+  if [[ ! -s "$path" ]]; then
+    echo "required output missing or empty: $path" >&2
+    exit 1
+  fi
+}
+
 actual_dir="$result_root/actual"
 profile_dir="$result_root/profiles"
 actual="$actual_dir/higgs-one-step-actual-cuda-bf16-auto-$label.safetensors"
@@ -136,6 +144,7 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --model-dir "$model_dir" \
   --golden "$golden" \
   --out "$actual"
+require_nonempty_file "$actual"
 
 echo "==> Running semantic comparison"
 cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
@@ -143,6 +152,7 @@ cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
   --golden "$golden" \
   --actual "$actual" | tee "$compare_log"
 grep -q "higgs one-step semantic comparison: ok" "$compare_log"
+require_nonempty_file "$compare_log"
 
 echo "==> Smoke-testing retained prompt session"
 cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
@@ -151,6 +161,8 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --golden "$golden" \
   --out "$session_actual" | tee "$session_smoke_log"
 grep -q "duplicate_request_id_guard: ok" "$session_smoke_log"
+require_nonempty_file "$session_actual"
+require_nonempty_file "$session_smoke_log"
 
 echo "==> Running session semantic comparison"
 cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
@@ -158,6 +170,10 @@ cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
   --golden "$golden" \
   --actual "$session_actual" | tee "$session_compare_log"
 grep -q "higgs one-step semantic comparison: ok" "$session_compare_log"
+require_nonempty_file "$session_compare_log"
+require_nonempty_file "$auto_view/config.json"
+require_nonempty_file "$auto_view/generation_config.json"
+require_nonempty_file "$auto_view/higgs-qwen3-tensor-aliases.json"
 
 echo "==> Auto config view"
 find "$auto_view" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort

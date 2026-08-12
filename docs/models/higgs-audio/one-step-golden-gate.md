@@ -426,13 +426,15 @@ tools/higgs/run_higgs_one_step_cuda_gate.sh \
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
 through the auto alias-view path, runs the semantic comparator, smoke-tests the
 prompt-only retained KV session path, compares that session actual against the
-same golden, and records the small generated Qwen3 config view. Add `--profile`
+same golden, asserts the persisted gate markers, verifies the generated files are
+non-empty, and records the small generated Qwen3 config view. Add `--profile`
 to capture an NSYS report for the same actual-dump path.
 
 The script was validated on the 4090-D host at `ec775ca` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
-request-id guard, persisted session-smoke log, and explicit persisted-marker
-assertions landed, producing the complete gate artifact set:
+request-id guard, persisted session-smoke log, explicit persisted-marker
+assertions, and non-empty artifact assertions landed, producing the complete gate
+artifact set:
 
 ```text
 actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-ec775ca.safetensors
