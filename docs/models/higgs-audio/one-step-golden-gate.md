@@ -84,6 +84,35 @@ This closes the prompt/head-source gap for the one-step fixture. It is still not
 a full SGLang-Omni runtime parity result because `sglang_omni.models.higgs_tts.model`
 depends on the uninstalled `sglang` package in the current 4090 environment.
 
+## SGLang-Omni Runtime Readiness Probe
+
+The branch also includes a lightweight import probe to keep the runtime parity
+claim auditable:
+
+```bash
+tools/higgs/check_higgs_sglang_omni_imports.py \
+  --sglang-omni-src /data/src/sglang-omni \
+  --require-direct
+```
+
+The current 4090-D environment reports:
+
+```text
+sglang_omni_src=/data/src/sglang-omni
+sglang_omni_commit=c6980be8
+module.sglang_omni.models.higgs_tts.text_tokenizer=ok
+module.sglang_omni.models.higgs_tts.modeling=ok
+module.sglang_omni.models.higgs_tts.hf_config=ok
+module.sglang_omni.models.higgs_tts.model=fail
+module.sglang_omni.models.higgs_tts.model.reason=missing_sglang
+direct_higgs_imports=ok
+full_higgs_model_import=missing_sglang
+```
+
+This means the one-step golden can be strict-checked against SGLang-Omni's Higgs
+source modules, but a full SGLang-Omni model/runtime comparison still needs an
+isolated environment with the `sglang` serving dependency installed.
+
 ## Generated Artifact
 
 The fork branch carries a small derived fixture:
