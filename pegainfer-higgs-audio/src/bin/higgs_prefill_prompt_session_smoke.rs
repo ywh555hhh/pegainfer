@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use pegainfer_higgs_audio::one_step_actual::{
     load_prompt_from_golden, write_one_step_actual_prediction,
@@ -73,6 +73,15 @@ fn main() -> Result<()> {
     )?;
     let request_id = RequestId::new(args.request_id);
     let session = runtime.prefill_prompt_session_from_prompt_ids(request_id, &prompt_ids)?;
+    if runtime
+        .prefill_prompt_session_from_prompt_ids(request_id, &prompt_ids)
+        .is_ok()
+    {
+        bail!(
+            "duplicate Higgs prompt-session prefill unexpectedly replaced request_id={}",
+            request_id.get()
+        );
+    }
     let summary = write_one_step_actual_prediction(
         &args.out,
         &prompt,
@@ -83,6 +92,7 @@ fn main() -> Result<()> {
 
     println!("higgs prompt-session prefill smoke: ok");
     println!("  request_id: {}", session.request_id.get());
+    println!("  duplicate_request_id_guard: ok");
     println!("  out: {}", summary.output_path.display());
     println!("  audio_head_backend: {:?}", args.audio_head_backend);
     println!("  prompt_tokens: {}", summary.prompt_tokens);

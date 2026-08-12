@@ -737,6 +737,11 @@ impl Qwen3Executor {
         prompt_tokens: Vec<u32>,
     ) -> Result<RetainedPrefillHiddenResult> {
         anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
+        anyhow::ensure!(
+            !self.request_kvs.contains_key(&request_id),
+            "request {:?} already has retained KV",
+            request_id
+        );
         let mut rkv = self.kv_mgr.new_request(
             prompt_tokens.clone(),
             0,
