@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, bail};
 
@@ -101,6 +101,19 @@ impl HiggsRuntimeLoadPlan {
             .iter()
             .find(|tensor| tensor.checkpoint_name == checkpoint_name)
     }
+
+    pub fn qwen3_tensor_aliases(&self) -> Result<BTreeMap<String, String>> {
+        self.tensors
+            .iter()
+            .filter(|tensor| tensor.loader_slot.starts_with("qwen3."))
+            .map(|tensor| {
+                Ok((
+                    qwen3_tensor_name(&tensor.loader_slot)?,
+                    tensor.checkpoint_name.clone(),
+                ))
+            })
+            .collect()
+    }
 }
 
 fn planned_tensor(spec: TensorHeaderSpec, manifest: &HiggsWeightManifest) -> Result<PlannedTensor> {
@@ -161,6 +174,17 @@ fn loader_slot(name: &str, role: TensorRole) -> Result<String> {
             let layer = layer_index(name)?;
             Ok(format!("qwen3.layers.{layer}.{}", layer_suffix(name)?))
         }
+    }
+}
+
+pub fn qwen3_tensor_name(loader_slot: &str) -> Result<String> {
+    match loader_slot {
+        "qwen3.embed_tokens" => Ok("model.embed_tokens.weight".to_string()),
+        "qwen3.norm" => Ok("model.norm.weight".to_string()),
+        slot if slot.starts_with("qwen3.layers.") => {
+            Ok(format!("model.layers.{}", &slot["qwen3.layers.".len()..]))
+        }
+        _ => bail!("loader slot {loader_slot} is not part of the Qwen3 body view"),
     }
 }
 
@@ -296,5 +320,30 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains(TEXT_EMBEDDING));
+    }
+
+    #[test]
+    fn builds_qwen3_tensor_aliases_without_audio_head() {
+        let cfg = config();
+        let plan = HiggsRuntimeLoadPlan::from_manifest(&cfg, &manifest()).unwrap();
+        let aliases = plan.qwen3_tensor_aliases().unwrap();
+
+        assert_eq!(aliases.len(), 398);
+        assert_eq!(
+            aliases.get("model.embed_tokens.weight").unwrap(),
+            TEXT_EMBEDDING
+        );
+        assert_eq!(aliases.get("model.norm.weight").unwrap(), BODY_NORM);
+        assert_eq!(
+            aliases
+                .get("model.layers.0.self_attn.q_proj.weight")
+                .unwrap(),
+            "body.layers.0.self_attn.q_proj.weight"
+        );
+        assert!(
+            !aliases
+                .values()
+                .any(|checkpoint_name| checkpoint_name == FUSED_MODALITY_EMBEDDING)
+        );
     }
 }

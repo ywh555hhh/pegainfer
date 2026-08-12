@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use crate::lora::{DeviceLoraAdapter, DeviceLoraLayer};
 use pegainfer_core::tensor::{DeviceContext, DeviceMatrix, DeviceVec};
 use pegainfer_core::weight_loader::{
-    deserialize_shards, load_shard_info, load_tensor_1d, load_tensor_2d, load_tensor_2d_col_shard,
-    load_tensor_2d_row_shard, mmap_shards, precompute_rope,
+    TensorNameAliases, deserialize_shards, load_shard_info, load_tensor_1d_with_aliases,
+    load_tensor_2d_col_shard_with_aliases, load_tensor_2d_row_shard_with_aliases,
+    load_tensor_2d_with_aliases, mmap_shards, precompute_rope,
 };
 
 pub(crate) struct KvBudget {
@@ -23,11 +24,13 @@ pub(crate) struct KvBudget {
     pub(crate) num_blocks: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ModelRuntimeConfig {
     pub(crate) enable_cuda_graph: bool,
     pub(crate) tensor_parallel: Option<TensorParallelConfig>,
     pub(crate) device_ordinal: usize,
+    pub(crate) weight_path: Option<String>,
+    pub(crate) tensor_name_aliases: TensorNameAliases,
 }
 
 impl Default for ModelRuntimeConfig {
@@ -36,6 +39,8 @@ impl Default for ModelRuntimeConfig {
             enable_cuda_graph: true,
             tensor_parallel: None,
             device_ordinal: 0,
+            weight_path: None,
+            tensor_name_aliases: TensorNameAliases::default(),
         }
     }
 }
@@ -106,23 +111,36 @@ impl Qwen3Model {
         let tensor_parallel = runtime.tensor_parallel.unwrap_or_default();
         tensor_parallel.validate_for(&config)?;
 
-        let (shard_paths, weight_map) = load_shard_info(model_path)?;
+        let weight_path = runtime.weight_path.as_deref().unwrap_or(model_path);
+        let (shard_paths, weight_map) = load_shard_info(weight_path)?;
         debug!("Loading {} safetensor shard(s)", shard_paths.len());
         let mmaps = mmap_shards(&shard_paths)?;
         let shards = deserialize_shards(&mmaps)?;
 
+        let tensor_name_aliases = &runtime.tensor_name_aliases;
+        if !tensor_name_aliases.is_empty() {
+            debug!("Loading Qwen3 weights through tensor-name aliases from {weight_path}");
+        }
+
         let t_gpu = Instant::now();
         debug!("Loading embeddings to GPU");
-        let embed_tokens = load_tensor_2d(&ctx, &shards, &weight_map, "model.embed_tokens.weight")?;
+        let embed_tokens = load_tensor_2d_with_aliases(
+            &ctx,
+            &shards,
+            &weight_map,
+            tensor_name_aliases,
+            "model.embed_tokens.weight",
+        )?;
         let lm_head = if config.tie_word_embeddings {
             debug!("Using tied input/output embeddings");
             None
         } else {
             debug!("Loading untied LM head to GPU");
-            Some(load_tensor_2d(
+            Some(load_tensor_2d_with_aliases(
                 &ctx,
                 &shards,
                 &weight_map,
+                tensor_name_aliases,
                 config.lm_head_tensor_name(),
             )?)
         };
@@ -141,53 +159,59 @@ impl Qwen3Model {
             let prefix = format!("model.layers.{}", i);
 
             let q_proj = if tensor_parallel.is_sharded() {
-                load_tensor_2d_row_shard(
+                load_tensor_2d_row_shard_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.q_proj.weight", prefix),
                     q_row_offset,
                     q_rows,
                 )?
             } else {
-                load_tensor_2d(
+                load_tensor_2d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.q_proj.weight", prefix),
                 )?
             };
             let k_proj = if tensor_parallel.is_sharded() {
-                load_tensor_2d_row_shard(
+                load_tensor_2d_row_shard_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.k_proj.weight", prefix),
                     kv_row_offset,
                     kv_rows,
                 )?
             } else {
-                load_tensor_2d(
+                load_tensor_2d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.k_proj.weight", prefix),
                 )?
             };
             let v_proj = if tensor_parallel.is_sharded() {
-                load_tensor_2d_row_shard(
+                load_tensor_2d_row_shard_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.v_proj.weight", prefix),
                     kv_row_offset,
                     kv_rows,
                 )?
             } else {
-                load_tensor_2d(
+                load_tensor_2d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.self_attn.v_proj.weight", prefix),
                 )?
             };
@@ -199,36 +223,40 @@ impl Qwen3Model {
             drop(v_proj);
 
             let gate_proj = if tensor_parallel.is_sharded() {
-                load_tensor_2d_row_shard(
+                load_tensor_2d_row_shard_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.mlp.gate_proj.weight", prefix),
                     inter_row_offset,
                     inter_rows,
                 )?
             } else {
-                load_tensor_2d(
+                load_tensor_2d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.mlp.gate_proj.weight", prefix),
                 )?
             };
             let up_proj = if tensor_parallel.is_sharded() {
-                load_tensor_2d_row_shard(
+                load_tensor_2d_row_shard_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.mlp.up_proj.weight", prefix),
                     inter_row_offset,
                     inter_rows,
                 )?
             } else {
-                load_tensor_2d(
+                load_tensor_2d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.mlp.up_proj.weight", prefix),
                 )?
             };
@@ -237,68 +265,76 @@ impl Qwen3Model {
             drop(up_proj);
 
             let block = TransformerBlock {
-                input_layernorm: load_tensor_1d(
+                input_layernorm: load_tensor_1d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.input_layernorm.weight", prefix),
                 )?,
                 attention: Attention {
                     qkv_proj,
                     o_proj: if tensor_parallel.is_sharded() {
-                        load_tensor_2d_col_shard(
+                        load_tensor_2d_col_shard_with_aliases(
                             &ctx,
                             &shards,
                             &weight_map,
+                            tensor_name_aliases,
                             &format!("{}.self_attn.o_proj.weight", prefix),
                             q_row_offset,
                             q_rows,
                         )?
                     } else {
-                        load_tensor_2d(
+                        load_tensor_2d_with_aliases(
                             &ctx,
                             &shards,
                             &weight_map,
+                            tensor_name_aliases,
                             &format!("{}.self_attn.o_proj.weight", prefix),
                         )?
                     },
-                    q_norm: load_tensor_1d(
+                    q_norm: load_tensor_1d_with_aliases(
                         &ctx,
                         &shards,
                         &weight_map,
+                        tensor_name_aliases,
                         &format!("{}.self_attn.q_norm.weight", prefix),
                     )?,
-                    k_norm: load_tensor_1d(
+                    k_norm: load_tensor_1d_with_aliases(
                         &ctx,
                         &shards,
                         &weight_map,
+                        tensor_name_aliases,
                         &format!("{}.self_attn.k_norm.weight", prefix),
                     )?,
                     q_dim,
                     kv_dim,
                 },
-                post_attention_layernorm: load_tensor_1d(
+                post_attention_layernorm: load_tensor_1d_with_aliases(
                     &ctx,
                     &shards,
                     &weight_map,
+                    tensor_name_aliases,
                     &format!("{}.post_attention_layernorm.weight", prefix),
                 )?,
                 mlp: MLP {
                     gate_up_proj,
                     down_proj: if tensor_parallel.is_sharded() {
-                        load_tensor_2d_col_shard(
+                        load_tensor_2d_col_shard_with_aliases(
                             &ctx,
                             &shards,
                             &weight_map,
+                            tensor_name_aliases,
                             &format!("{}.mlp.down_proj.weight", prefix),
                             inter_row_offset,
                             inter_rows,
                         )?
                     } else {
-                        load_tensor_2d(
+                        load_tensor_2d_with_aliases(
                             &ctx,
                             &shards,
                             &weight_map,
+                            tensor_name_aliases,
                             &format!("{}.mlp.down_proj.weight", prefix),
                         )?
                     },
@@ -307,7 +343,13 @@ impl Qwen3Model {
             layers.push(block);
         }
 
-        let norm = load_tensor_1d(&ctx, &shards, &weight_map, "model.norm.weight")?;
+        let norm = load_tensor_1d_with_aliases(
+            &ctx,
+            &shards,
+            &weight_map,
+            tensor_name_aliases,
+            "model.norm.weight",
+        )?;
 
         debug!("Precomputing RoPE cache on GPU");
         let (cos_cache, sin_cache) =

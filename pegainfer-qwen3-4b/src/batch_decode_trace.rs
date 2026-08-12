@@ -36,6 +36,8 @@ pub fn trace_decode_kernel_calls(
             enable_cuda_graph: false,
             tensor_parallel: None,
             device_ordinal: 0,
+            weight_path: None,
+            tensor_name_aliases: pegainfer_core::weight_loader::TensorNameAliases::default(),
         },
     )?;
     let budget = model.kv_budget();

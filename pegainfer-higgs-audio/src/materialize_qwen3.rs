@@ -2,17 +2,24 @@ use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 
 use crate::config::HiggsConfig;
-use crate::load_plan::{HiggsRuntimeLoadPlan, PlannedTensor};
+use crate::load_plan::{HiggsRuntimeLoadPlan, PlannedTensor, qwen3_tensor_name};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializeSummary {
     pub output_dir: PathBuf,
     pub tensors: usize,
     pub payload_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigViewSummary {
+    pub output_dir: PathBuf,
+    pub alias_manifest: PathBuf,
+    pub aliases: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,6 +72,33 @@ pub fn materialize_qwen3_body_view(
         output_dir: output_dir.to_path_buf(),
         tensors: qwen_tensors.len(),
         payload_bytes: qwen_tensors.iter().map(|tensor| tensor.bytes).sum(),
+    })
+}
+
+pub fn write_qwen3_config_view(
+    output_dir: impl AsRef<Path>,
+    config: &HiggsConfig,
+    load_plan: &HiggsRuntimeLoadPlan,
+) -> Result<ConfigViewSummary> {
+    let output_dir = output_dir.as_ref();
+    std::fs::create_dir_all(output_dir)
+        .with_context(|| format!("create {}", output_dir.display()))?;
+    write_qwen3_config(output_dir, config)?;
+    write_generation_config(output_dir, config)?;
+
+    let aliases = load_plan.qwen3_tensor_aliases()?;
+    let alias_manifest = output_dir.join("higgs-qwen3-tensor-aliases.json");
+    write_json(
+        &alias_manifest,
+        &json!({
+            "format": "higgs-qwen3-tensor-aliases-v1",
+            "requested_to_stored": aliases,
+        }),
+    )?;
+    Ok(ConfigViewSummary {
+        output_dir: output_dir.to_path_buf(),
+        alias_manifest,
+        aliases: load_plan.qwen3_tensor_aliases()?.len(),
     })
 }
 
@@ -261,17 +295,6 @@ fn copy_exact_range(
         remaining -= chunk;
     }
     Ok(())
-}
-
-fn qwen3_tensor_name(loader_slot: &str) -> Result<String> {
-    match loader_slot {
-        "qwen3.embed_tokens" => Ok("model.embed_tokens.weight".to_string()),
-        "qwen3.norm" => Ok("model.norm.weight".to_string()),
-        slot if slot.starts_with("qwen3.layers.") => {
-            Ok(format!("model.layers.{}", &slot["qwen3.layers.".len()..]))
-        }
-        _ => bail!("loader slot {loader_slot} is not part of the Qwen3 body view"),
-    }
 }
 
 #[cfg(test)]

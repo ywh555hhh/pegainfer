@@ -12,6 +12,35 @@ use std::time::Instant;
 
 use crate::tensor::{DeviceContext, DeviceMatrix, DeviceVec};
 
+/// Optional mapping from the model runtime's expected tensor name to the name
+/// stored in the safetensors shard.
+///
+/// This keeps normal model loading unchanged while allowing model adapters to
+/// reuse an existing checkpoint layout without materializing a renamed copy.
+#[derive(Clone, Debug, Default)]
+pub struct TensorNameAliases {
+    storage_by_requested: HashMap<String, String>,
+}
+
+impl TensorNameAliases {
+    pub fn new(storage_by_requested: HashMap<String, String>) -> Self {
+        Self {
+            storage_by_requested,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.storage_by_requested.is_empty()
+    }
+
+    fn storage_name<'a>(&'a self, requested_name: &'a str) -> &'a str {
+        self.storage_by_requested
+            .get(requested_name)
+            .map(String::as_str)
+            .unwrap_or(requested_name)
+    }
+}
+
 /// Load shard metadata. Returns (shard_file_paths, weight_map: tensor_name -> shard_index)
 pub fn load_shard_info(model_path: &str) -> Result<(Vec<String>, HashMap<String, usize>)> {
     let single_path = format!("{}/model.safetensors", model_path);
@@ -91,18 +120,30 @@ fn find_tensor<'a>(
     weight_map: &HashMap<String, usize>,
     name: &str,
 ) -> Result<safetensors::tensor::TensorView<'a>> {
-    if let Some(&idx) = weight_map.get(name) {
-        shards[idx]
-            .tensor(name)
-            .map_err(|e| anyhow::anyhow!("Failed to load tensor '{}': {}", name, e))
+    find_tensor_with_aliases(shards, weight_map, &TensorNameAliases::default(), name)
+}
+
+fn find_tensor_with_aliases<'a>(
+    shards: &'a [SafeTensors<'a>],
+    weight_map: &HashMap<String, usize>,
+    aliases: &TensorNameAliases,
+    name: &str,
+) -> Result<safetensors::tensor::TensorView<'a>> {
+    let storage_name = aliases.storage_name(name);
+    if let Some(&idx) = weight_map.get(storage_name) {
+        shards[idx].tensor(storage_name).map_err(|e| {
+            anyhow::anyhow!("Failed to load tensor '{name}' stored as '{storage_name}': {e}")
+        })
     } else {
         // Fallback: try all shards (single-file case)
         for shard in shards {
-            if let Ok(t) = shard.tensor(name) {
+            if let Ok(t) = shard.tensor(storage_name) {
                 return Ok(t);
             }
         }
-        Err(anyhow::anyhow!("Tensor '{}' not found in any shard", name))
+        Err(anyhow::anyhow!(
+            "Tensor '{name}' stored as '{storage_name}' not found in any shard"
+        ))
     }
 }
 
@@ -113,6 +154,17 @@ pub fn load_tensor_1d(
     name: &str,
 ) -> Result<DeviceVec> {
     let tensor = find_tensor(shards, weight_map, name)?;
+    DeviceVec::from_safetensors(ctx, tensor.data())
+}
+
+pub fn load_tensor_1d_with_aliases(
+    ctx: &DeviceContext,
+    shards: &[SafeTensors],
+    weight_map: &HashMap<String, usize>,
+    aliases: &TensorNameAliases,
+    name: &str,
+) -> Result<DeviceVec> {
+    let tensor = find_tensor_with_aliases(shards, weight_map, aliases, name)?;
     DeviceVec::from_safetensors(ctx, tensor.data())
 }
 
@@ -127,6 +179,18 @@ pub fn load_tensor_2d(
     DeviceMatrix::from_safetensors(ctx, tensor.data(), shape[0], shape[1])
 }
 
+pub fn load_tensor_2d_with_aliases(
+    ctx: &DeviceContext,
+    shards: &[SafeTensors],
+    weight_map: &HashMap<String, usize>,
+    aliases: &TensorNameAliases,
+    name: &str,
+) -> Result<DeviceMatrix> {
+    let tensor = find_tensor_with_aliases(shards, weight_map, aliases, name)?;
+    let shape = tensor.shape();
+    DeviceMatrix::from_safetensors(ctx, tensor.data(), shape[0], shape[1])
+}
+
 #[allow(clippy::cast_ptr_alignment)]
 pub fn load_tensor_2d_row_shard(
     ctx: &DeviceContext,
@@ -137,6 +201,31 @@ pub fn load_tensor_2d_row_shard(
     rows: usize,
 ) -> Result<DeviceMatrix> {
     let tensor = find_tensor(shards, weight_map, name)?;
+    load_tensor_2d_row_shard_view(ctx, tensor, name, row_offset, rows)
+}
+
+#[allow(clippy::cast_ptr_alignment)]
+pub fn load_tensor_2d_row_shard_with_aliases(
+    ctx: &DeviceContext,
+    shards: &[SafeTensors],
+    weight_map: &HashMap<String, usize>,
+    aliases: &TensorNameAliases,
+    name: &str,
+    row_offset: usize,
+    rows: usize,
+) -> Result<DeviceMatrix> {
+    let tensor = find_tensor_with_aliases(shards, weight_map, aliases, name)?;
+    load_tensor_2d_row_shard_view(ctx, tensor, name, row_offset, rows)
+}
+
+#[allow(clippy::cast_ptr_alignment)]
+fn load_tensor_2d_row_shard_view(
+    ctx: &DeviceContext,
+    tensor: safetensors::tensor::TensorView<'_>,
+    name: &str,
+    row_offset: usize,
+    rows: usize,
+) -> Result<DeviceMatrix> {
     let shape = tensor.shape();
     if shape.len() != 2 {
         return Err(anyhow::anyhow!(
@@ -174,6 +263,31 @@ pub fn load_tensor_2d_col_shard(
     cols: usize,
 ) -> Result<DeviceMatrix> {
     let tensor = find_tensor(shards, weight_map, name)?;
+    load_tensor_2d_col_shard_view(ctx, tensor, name, col_offset, cols)
+}
+
+#[allow(clippy::cast_ptr_alignment)]
+pub fn load_tensor_2d_col_shard_with_aliases(
+    ctx: &DeviceContext,
+    shards: &[SafeTensors],
+    weight_map: &HashMap<String, usize>,
+    aliases: &TensorNameAliases,
+    name: &str,
+    col_offset: usize,
+    cols: usize,
+) -> Result<DeviceMatrix> {
+    let tensor = find_tensor_with_aliases(shards, weight_map, aliases, name)?;
+    load_tensor_2d_col_shard_view(ctx, tensor, name, col_offset, cols)
+}
+
+#[allow(clippy::cast_ptr_alignment)]
+fn load_tensor_2d_col_shard_view(
+    ctx: &DeviceContext,
+    tensor: safetensors::tensor::TensorView<'_>,
+    name: &str,
+    col_offset: usize,
+    cols: usize,
+) -> Result<DeviceMatrix> {
     let shape = tensor.shape();
     if shape.len() != 2 {
         return Err(anyhow::anyhow!(

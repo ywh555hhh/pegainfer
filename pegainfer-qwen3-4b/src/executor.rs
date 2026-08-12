@@ -12,6 +12,7 @@ use pegainfer_core::kv_pool::KvLayout;
 use pegainfer_core::ops;
 use pegainfer_core::sampler::SamplingParams;
 use pegainfer_core::tensor::{DeviceContext, DeviceVec, HiddenStates};
+use pegainfer_core::weight_loader::TensorNameAliases;
 use pegainfer_kv_cache::{KvBuffer, KvCacheManager, KvView};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -533,6 +534,22 @@ impl Qwen3Executor {
         enable_cuda_graph: bool,
         device_ordinals: &[usize],
     ) -> Result<Self> {
+        Self::from_runtime_with_weight_source(
+            model_path,
+            None,
+            TensorNameAliases::default(),
+            enable_cuda_graph,
+            device_ordinals,
+        )
+    }
+
+    pub fn from_runtime_with_weight_source(
+        model_path: &str,
+        weight_path: Option<&str>,
+        tensor_name_aliases: TensorNameAliases,
+        enable_cuda_graph: bool,
+        device_ordinals: &[usize],
+    ) -> Result<Self> {
         anyhow::ensure!(
             !device_ordinals.is_empty(),
             "Qwen3 executor requires at least one device"
@@ -544,6 +561,8 @@ impl Qwen3Executor {
                     enable_cuda_graph,
                     tensor_parallel: None,
                     device_ordinal: device_ordinals[0],
+                    weight_path: weight_path.map(str::to_string),
+                    tensor_name_aliases,
                 },
             )?;
             return Self::single(model);
@@ -558,6 +577,8 @@ impl Qwen3Executor {
                     enable_cuda_graph,
                     tensor_parallel: Some(TensorParallelConfig { rank, world_size }),
                     device_ordinal,
+                    weight_path: weight_path.map(str::to_string),
+                    tensor_name_aliases: tensor_name_aliases.clone(),
                 },
             )?);
         }
