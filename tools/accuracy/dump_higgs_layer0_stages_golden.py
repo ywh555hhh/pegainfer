@@ -11,6 +11,8 @@ from pathlib import Path
 import torch
 from safetensors.torch import save_file
 
+from transformers.models.qwen3.modeling_qwen3 import apply_rotary_pos_emb
+
 from dump_higgs_one_step_golden import (
     DEFAULT_MODEL_ID,
     DEFAULT_PROMPTS,
@@ -68,6 +70,8 @@ def main() -> None:
     backbone = load_backbone(model_file, text_cfg, args.device)
     layer0 = backbone.layers[0]
     stages: dict[str, torch.Tensor] = {}
+    q_norm_all: torch.Tensor | None = None
+    k_norm_all: torch.Tensor | None = None
 
     def capture(name: str):
         def hook(_module, _inputs, output):
@@ -82,12 +86,22 @@ def main() -> None:
 
         return hook
 
+    def capture_q_norm(_module, _inputs, output):
+        nonlocal q_norm_all
+        q_norm_all = output.detach().contiguous().clone()
+
+    def capture_k_norm(_module, _inputs, output):
+        nonlocal k_norm_all
+        k_norm_all = output.detach().contiguous().clone()
+
     hooks = [
         backbone.embed_tokens.register_forward_hook(capture("layer0.input_hidden.bf16")),
         layer0.input_layernorm.register_forward_hook(capture("layer0.input_norm.bf16")),
         layer0.self_attn.q_proj.register_forward_hook(capture("layer0.q_proj.bf16")),
         layer0.self_attn.k_proj.register_forward_hook(capture("layer0.k_proj.bf16")),
         layer0.self_attn.v_proj.register_forward_hook(capture("layer0.v_proj.bf16")),
+        layer0.self_attn.q_norm.register_forward_hook(capture_q_norm),
+        layer0.self_attn.k_norm.register_forward_hook(capture_k_norm),
         layer0.self_attn.o_proj.register_forward_pre_hook(capture_pre("layer0.attn_output.bf16")),
         layer0.self_attn.o_proj.register_forward_hook(capture("layer0.o_proj.bf16")),
         layer0.post_attention_layernorm.register_forward_hook(capture("layer0.post_attn_norm.bf16")),
@@ -109,12 +123,35 @@ def main() -> None:
         for hook in hooks:
             hook.remove()
 
+    if q_norm_all is None or k_norm_all is None:
+        raise RuntimeError("missing q/k norm snapshots")
+    position_ids = torch.arange(max_len, device=args.device).unsqueeze(0)
+    cos, sin = backbone.rotary_emb(input_ids, position_ids)
+    q_rope, k_rope = apply_rotary_pos_emb(
+        q_norm_all.transpose(1, 2),
+        k_norm_all.transpose(1, 2),
+        cos,
+        sin,
+    )
+    stages["layer0.q_norm_rope.bf16"] = last_token(
+        q_rope.transpose(1, 2).reshape(len(prompt_ids), max_len, -1),
+        row_idx,
+        prompt_lens_device,
+    )
+    stages["layer0.k_norm_rope.bf16"] = last_token(
+        k_rope.transpose(1, 2).reshape(len(prompt_ids), max_len, -1),
+        row_idx,
+        prompt_lens_device,
+    )
+
     expected = [
         "layer0.input_hidden.bf16",
         "layer0.input_norm.bf16",
         "layer0.q_proj.bf16",
         "layer0.k_proj.bf16",
         "layer0.v_proj.bf16",
+        "layer0.q_norm_rope.bf16",
+        "layer0.k_norm_rope.bf16",
         "layer0.attn_output.bf16",
         "layer0.o_proj.bf16",
         "layer0.post_attn_norm.bf16",

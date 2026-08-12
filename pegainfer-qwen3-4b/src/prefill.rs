@@ -631,6 +631,20 @@ impl Qwen3Model {
         )?;
         push_stage(
             &mut stages,
+            "layer0.q_norm_rope.bf16",
+            &self.ctx,
+            &bufs.q_batch,
+            last_token_idx,
+        )?;
+        push_stage(
+            &mut stages,
+            "layer0.k_norm_rope.bf16",
+            &self.ctx,
+            &bufs.k_batch,
+            last_token_idx,
+        )?;
+        push_stage(
+            &mut stages,
             "layer0.attn_output.bf16",
             &self.ctx,
             &bufs.attn_output,

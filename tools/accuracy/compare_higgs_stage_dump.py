@@ -17,6 +17,8 @@ STAGE_ORDER = [
     "layer0.q_proj.bf16",
     "layer0.k_proj.bf16",
     "layer0.v_proj.bf16",
+    "layer0.q_norm_rope.bf16",
+    "layer0.k_norm_rope.bf16",
     "layer0.attn_output.bf16",
     "layer0.o_proj.bf16",
     "layer0.post_attn_norm.bf16",
