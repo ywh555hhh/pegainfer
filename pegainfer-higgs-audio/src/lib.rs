@@ -8,5 +8,6 @@
 pub mod compare;
 pub mod config;
 pub mod load_plan;
+pub mod materialize_qwen3;
 pub mod one_step_golden;
 pub mod weights;

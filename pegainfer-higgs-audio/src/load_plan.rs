@@ -219,6 +219,7 @@ mod tests {
                 "num_key_value_heads": EXPECTED_NUM_KV_HEADS,
                 "head_dim": EXPECTED_HEAD_DIM,
                 "vocab_size": EXPECTED_TEXT_VOCAB_SIZE,
+                "rms_norm_eps": 1e-6,
                 "max_position_embeddings": 32768,
                 "eos_token_id": 151643,
                 "tie_word_embeddings": true,

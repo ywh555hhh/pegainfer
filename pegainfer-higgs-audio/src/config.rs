@@ -17,7 +17,7 @@ pub const EXPECTED_TEXT_VOCAB_SIZE: usize = 151_936;
 pub const EXPECTED_ROPE_THETA: u64 = 1_000_000;
 pub const EXPECTED_MODEL_CARD_CONTEXT: usize = 8192;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HiggsConfig {
     pub model_type: String,
     pub architecture: String,
@@ -26,7 +26,7 @@ pub struct HiggsConfig {
     pub audio: AudioEncoderConfig,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TextConfig {
     pub hidden_size: usize,
     pub intermediate_size: usize,
@@ -35,6 +35,7 @@ pub struct TextConfig {
     pub num_key_value_heads: usize,
     pub head_dim: usize,
     pub vocab_size: usize,
+    pub rms_norm_eps: f32,
     pub max_position_embeddings: usize,
     pub eos_token_id: u32,
     pub tie_word_embeddings: bool,
@@ -80,6 +81,7 @@ impl HiggsConfig {
                 num_key_value_heads: usize_field(text, "num_key_value_heads")?,
                 head_dim: usize_field(text, "head_dim")?,
                 vocab_size: usize_field(text, "vocab_size")?,
+                rms_norm_eps: f32_field(text, "rms_norm_eps")?,
                 max_position_embeddings: usize_field(text, "max_position_embeddings")?,
                 eos_token_id: u32_field(text, "eos_token_id")?,
                 tie_word_embeddings: bool_field(text, "tie_word_embeddings")?,
@@ -194,6 +196,14 @@ fn i64_field(value: &Value, key: &str) -> Result<i64> {
         .with_context(|| format!("missing i64 field {key}"))
 }
 
+fn f32_field(value: &Value, key: &str) -> Result<f32> {
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .map(|value| value as f32)
+        .with_context(|| format!("missing f32 field {key}"))
+}
+
 fn bool_field(value: &Value, key: &str) -> Result<bool> {
     value
         .get(key)
@@ -218,6 +228,7 @@ mod tests {
                 "num_key_value_heads": EXPECTED_NUM_KV_HEADS,
                 "head_dim": EXPECTED_HEAD_DIM,
                 "vocab_size": EXPECTED_TEXT_VOCAB_SIZE,
+                "rms_norm_eps": 1e-6,
                 "max_position_embeddings": 32768,
                 "eos_token_id": 151643,
                 "tie_word_embeddings": true,
