@@ -654,7 +654,7 @@ impl Qwen3Model {
 
         pegainfer_kernels::ops::fused_add_rms_norm_round_batch_into(
             &self.ctx,
-            &hidden,
+            &mut hidden,
             &bufs.o_buf,
             &layer.post_attention_layernorm,
             self.config.rms_norm_eps,
