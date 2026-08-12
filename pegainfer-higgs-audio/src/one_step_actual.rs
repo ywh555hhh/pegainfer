@@ -150,6 +150,107 @@ pub fn write_one_step_actual(
 
     let logits = audio_logits(final_hidden, audio_head);
     let (top_ids, top_logprobs, argmax) = audio_topk_and_argmax(&logits);
+    write_one_step_actual_tensors(
+        output_path,
+        prompt,
+        final_hidden,
+        &logits,
+        &top_ids,
+        &top_logprobs,
+        &argmax,
+    )
+}
+
+#[cfg(feature = "runtime-qwen3")]
+pub fn write_one_step_actual_with_gpu_audio_head(
+    output_path: impl AsRef<Path>,
+    prompt: &PromptTensors,
+    final_hidden: &[bf16],
+    audio_head: &[bf16],
+    device_ordinal: usize,
+) -> Result<OneStepActualSummary> {
+    ensure!(
+        final_hidden.len() == HIDDEN_SIZE,
+        "final hidden len mismatch: expected {HIDDEN_SIZE}, got {}",
+        final_hidden.len()
+    );
+    ensure!(
+        audio_head.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
+        "audio head len mismatch: expected {}, got {}",
+        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE,
+        audio_head.len()
+    );
+
+    let logits = audio_logits_gpu_bf16(final_hidden, audio_head, device_ordinal)?;
+    let (top_ids, top_logprobs, argmax) = audio_topk_and_argmax(&logits);
+    write_one_step_actual_tensors(
+        output_path,
+        prompt,
+        final_hidden,
+        &logits,
+        &top_ids,
+        &top_logprobs,
+        &argmax,
+    )
+}
+
+#[cfg(feature = "runtime-qwen3")]
+fn audio_logits_gpu_bf16(
+    final_hidden: &[bf16],
+    audio_head: &[bf16],
+    device_ordinal: usize,
+) -> Result<Vec<f32>> {
+    let ctx = pegainfer_core::tensor::DeviceContext::new_with_device(device_ordinal).with_context(
+        || format!("create CUDA context for audio head on device {device_ordinal}"),
+    )?;
+    let hidden = pegainfer_core::tensor::DeviceVec::from_host(&ctx, final_hidden)
+        .context("copy final hidden to GPU for Higgs audio head")?;
+    let head = pegainfer_core::tensor::DeviceMatrix::from_host(
+        &ctx,
+        audio_head,
+        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE,
+        HIDDEN_SIZE,
+    )
+    .context("copy fused Higgs audio head to GPU")?;
+    let logits = pegainfer_core::ops::linear(&ctx, &hidden, &head)
+        .context("run Higgs fused audio head as CUDA bf16 linear")?;
+    logits
+        .to_host(&ctx)
+        .context("copy Higgs audio logits from GPU")
+}
+
+fn write_one_step_actual_tensors(
+    output_path: impl AsRef<Path>,
+    prompt: &PromptTensors,
+    final_hidden: &[bf16],
+    logits: &[f32],
+    top_ids: &[i64],
+    top_logprobs: &[f32],
+    argmax: &[i64],
+) -> Result<OneStepActualSummary> {
+    ensure!(
+        logits.len() == NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE,
+        "audio logits len mismatch: expected {}, got {}",
+        NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE,
+        logits.len()
+    );
+    ensure!(
+        top_ids.len() == NUM_CODEBOOKS * TOP_K,
+        "top id len mismatch: expected {}, got {}",
+        NUM_CODEBOOKS * TOP_K,
+        top_ids.len()
+    );
+    ensure!(
+        top_logprobs.len() == NUM_CODEBOOKS * TOP_K,
+        "top logprob len mismatch: expected {}, got {}",
+        NUM_CODEBOOKS * TOP_K,
+        top_logprobs.len()
+    );
+    ensure!(
+        argmax.len() == NUM_CODEBOOKS,
+        "argmax len mismatch: expected {NUM_CODEBOOKS}, got {}",
+        argmax.len()
+    );
     let output_path = output_path.as_ref();
     let tensors = BTreeMap::from([
         (
@@ -173,19 +274,19 @@ pub fn write_one_step_actual(
         ),
         (
             AUDIO_LOGITS_F32.to_string(),
-            owned_f32(&[1, NUM_CODEBOOKS, CODEBOOK_VOCAB_SIZE], &logits),
+            owned_f32(&[1, NUM_CODEBOOKS, CODEBOOK_VOCAB_SIZE], logits),
         ),
         (
             AUDIO_TOP64_IDS.to_string(),
-            owned_i64(&[1, NUM_CODEBOOKS, TOP_K], &top_ids),
+            owned_i64(&[1, NUM_CODEBOOKS, TOP_K], top_ids),
         ),
         (
             AUDIO_TOP64_LOGPROBS_F32.to_string(),
-            owned_f32(&[1, NUM_CODEBOOKS, TOP_K], &top_logprobs),
+            owned_f32(&[1, NUM_CODEBOOKS, TOP_K], top_logprobs),
         ),
         (
             AUDIO_ARGMAX_IDS.to_string(),
-            owned_i64(&[1, NUM_CODEBOOKS], &argmax),
+            owned_i64(&[1, NUM_CODEBOOKS], argmax),
         ),
     ]);
     let metadata = HashMap::from([(

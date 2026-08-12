@@ -13,8 +13,9 @@ import sys
 from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
+text = re.sub(r'^pegainfer-core = .*\n', '', text, flags=re.MULTILINE)
 text = re.sub(r'^pegainfer-qwen3-4b = .*\n', '', text, flags=re.MULTILINE)
-text = re.sub(r'\n\[features\]\nruntime-qwen3 = .*\n', '\n', text)
+text = re.sub(r'runtime-qwen3 = .*\n', 'runtime-qwen3 = []\n', text)
 text = re.sub(r'\n\[\[bin\]\]\nname = "higgs_dump_one_step_actual"\npath = "src/bin/higgs_dump_one_step_actual.rs"\nrequired-features = \["runtime-qwen3"\]\n', '\n', text)
 path.write_text(text)
 PY
