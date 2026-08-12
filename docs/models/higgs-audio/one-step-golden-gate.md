@@ -420,7 +420,7 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label 6b7cbbd
+  --label c9a839a
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
@@ -431,26 +431,50 @@ non-empty, writes a key-value gate summary, and records the small generated Qwen
 config view. Add `--profile` to capture an NSYS report for the same actual-dump
 path.
 
-The script was validated on the 4090-D host at `6b7cbbd` after the retained
+The script was validated on the 4090-D host at `c9a839a` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
 request-id guard, persisted session-smoke log, explicit persisted-marker
 assertions, non-empty artifact assertions, and key-value gate summary landed,
 producing the complete gate artifact set:
 
 ```text
-actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-6b7cbbd.safetensors
-session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-6b7cbbd.safetensors
-compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-6b7cbbd.txt
-smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-6b7cbbd.txt
-session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-6b7cbbd.txt
-summary:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-cuda-gate-6b7cbbd.txt
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-c9a839a.safetensors
+session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-c9a839a.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-c9a839a.txt
+smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-c9a839a.txt
+session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-c9a839a.txt
+summary:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-cuda-gate-c9a839a.txt
 semantic comparison: ok
 session semantic comparison: ok
 duplicate_request_id_guard: ok
+artifacts_nonempty: ok
 auto view:
   config.json 306 bytes
   generation_config.json 29 bytes
   higgs-qwen3-tensor-aliases.json 34933 bytes
+```
+
+The persisted key-value summary for that run is:
+
+```text
+status=ok
+repo=/data/src/pegainfer
+commit=c9a839a7
+label=c9a839a
+model_dir=/data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561
+golden=/data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors
+sm=89
+nvcc_jobs=8
+actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-c9a839a.safetensors
+session_actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-c9a839a.safetensors
+compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-c9a839a.txt
+session_smoke_log=/data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-c9a839a.txt
+session_compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-c9a839a.txt
+auto_view=/data/results/pegainfer/higgs-audio/actual/higgs-qwen3-config-view
+semantic_comparison=ok
+session_semantic_comparison=ok
+duplicate_request_id_guard=ok
+artifacts_nonempty=ok
 ```
 
 The session smoke retains the prompt KV under request id `1`, emits the same
