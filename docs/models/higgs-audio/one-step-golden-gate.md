@@ -21,6 +21,36 @@ gate is:
 audio_logits.f32: [1, 8, 1026]
 ```
 
+## Current 4090 Parity Answer
+
+As of the latest 4090-D evidence, the answer is deliberately split:
+
+| Question | Current evidence | Claim status |
+| --- | --- | --- |
+| Does the PegaInfer/OpenInfer-style Higgs bridge run against the committed golden? | Yes. `run_higgs_one_step_cuda_gate.sh` produced a CUDA bf16 actual dump and the semantic comparator passed for both the one-shot path and retained prompt-session smoke. | **Proven for one-step semantic parity**, not strict tensor equality. |
+| Does SGLang-Omni source produce the same committed golden? | Yes. `run_higgs_sglang_omni_source_gate.sh` imports the real Higgs tokenizer/head source modules, regenerates the reference, and strict-compares it to the committed fixture. | **Proven for source-reference parity**. |
+| Has the full SGLang-Omni Higgs model/runtime produced the same output in this environment? | No. The readiness probe imports `text_tokenizer.py`, `modeling.py`, and `hf_config.py`, but `sglang_omni.models.higgs_tts.model` fails because the `sglang` runtime dependency is not installed. | **Not proven**. Do not claim runtime parity yet. |
+
+The strongest safe public wording today is:
+
+```text
+Built a fail-closed Higgs-Audio one-step golden gate for PegaInfer/OpenInfer:
+SGLang-Omni Higgs tokenizer/head source semantics strict-match the committed
+golden, and the PegaInfer CUDA bf16 one-step bridge matches the same fixture at
+the semantic level on RTX 4090-D.
+```
+
+The unsafe wording is:
+
+```text
+Matched SGLang-Omni runtime output end-to-end.
+```
+
+That has not been shown yet. To make that claim, the next evidence must come
+from an isolated SGLang-Omni runtime environment that can import and execute the
+full Higgs model path, dump the same one-step tensors, and compare them against
+the same committed fixture or a newly documented runtime fixture.
+
 ## Reference Design
 
 The generator uses SGLang-Omni's Higgs semantics without importing the full
