@@ -414,8 +414,8 @@ The semantic comparison mode is expected to pass on this CUDA bf16 actual dump:
 ```text
 higgs one-step strict comparison: passed=false diagnostic_only=true
 higgs one-step semantic comparison:
-  prompt_exact=true argmax_exact=true hidden_cosine=0.999898791 hidden_cosine_min=0.999800026
-  logits_cosine=0.999995470 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
+  prompt_exact=true argmax_exact=true hidden_cosine=0.999898851 hidden_cosine_min=0.999800026
+  logits_cosine=0.999990344 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
   top64_min_overlap=42 top64_mean_overlap=50.00 top64_min_overlap_tol=40
 higgs one-step semantic comparison: ok
 ```
