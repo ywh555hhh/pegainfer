@@ -136,13 +136,14 @@ tensor names to the future loader slots:
   `higgs.fused_audio_head`
 
 The plan currently covers 399 BF16 tensors: 398 Qwen3 backbone tensors plus the
-single fused Higgs audio head. It is intentionally a pure metadata layer: it does
-not allocate GPU memory or read tensor payloads yet. The next runtime slice
-should make the GPU loader consume this plan directly.
+single fused Higgs audio head. It can now produce the Qwen3 requested-name to
+Higgs stored-name alias map consumed by the runtime bridge, so the body weights
+can be read from the original checkpoint without materializing a renamed copy.
 
-## Qwen3 Body View
+## Qwen3 Runtime Bridge
 
-The sixth slice adds a bridge materializer:
+The sixth slice originally added a bridge materializer that rewrites the single
+Higgs safetensors shard into a Qwen3-compatible view:
 
 ```bash
 cargo run -p pegainfer-higgs-audio --bin higgs_materialize_qwen3_body -- \
@@ -150,20 +151,31 @@ cargo run -p pegainfer-higgs-audio --bin higgs_materialize_qwen3_body -- \
   --out-dir /data/results/pegainfer/higgs-audio/qwen3-body-view
 ```
 
-It rewrites the single Higgs safetensors shard into a Qwen3-compatible view:
+That fallback view contains 398 BF16 tensors, excludes the fused Higgs audio
+head, and duplicates the 7.5 GiB body payload. The safetensors header is padded
+so the payload start is aligned for `bf16`; without this, debug Rust aborts
+inside `DeviceMatrix::from_safetensors` when it casts tensor payload bytes.
 
-- `tied.embedding.text_embedding.weight` -> `model.embed_tokens.weight`
-- `body.norm.weight` -> `model.norm.weight`
-- `body.layers.N.*` -> `model.layers.N.*`
+The preferred bridge now avoids the payload copy. It writes only a Qwen3 config
+view plus a tensor-alias manifest, then asks the Qwen3 runtime to load requested
+`model.*` tensors from their stored Higgs names:
 
-The materialized view contains 398 BF16 tensors and excludes the fused Higgs
-audio head. This is a bridge, not the final loader design: it duplicates the
-7.5 GiB body payload so the existing `pegainfer-qwen3-4b` loader can be used
-unchanged while the Higgs-owned loader contract is still being shaped.
+```bash
+cargo run --release -p pegainfer-higgs-audio --bin higgs_materialize_qwen3_body -- \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --out-dir /data/results/pegainfer/higgs-audio/qwen3-config-view-alias \
+  --metadata-only
+```
 
-The safetensors header is padded so the payload start is aligned for `bf16`.
-Without this, debug Rust aborts inside `DeviceMatrix::from_safetensors` when it
-casts tensor payload bytes to `bf16`.
+The alias map has 398 entries and keeps the fused Higgs audio head outside the
+Qwen3 body loader:
+
+- `model.embed_tokens.weight` -> `tied.embedding.text_embedding.weight`
+- `model.norm.weight` -> `body.norm.weight`
+- `model.layers.N.*` -> `body.layers.N.*`
+
+`higgs_dump_one_step_actual` accepts this path through `--qwen3-config-dir`;
+`--qwen3-body-dir` remains available for fallback and bisecting.
 
 ## Comparison Gate
 
@@ -236,7 +248,7 @@ isolation only; it does not replace full workspace CI.
 ## 4090 Bring-Up Notes
 
 The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
-`18137c4` on branch `feat/higgs-audio-one-step-golden`.
+`d8dc73e` on branch `feat/higgs-audio-one-step-golden`.
 
 Static model/golden validation passed on the 4090 host with the Python reference
 environment:
@@ -260,15 +272,15 @@ The Rust isolated Higgs gate and the real checkpoint header gate passed on the
 4090 host:
 
 ```text
-isolated Higgs tests: 20 passed
+isolated Higgs tests: 21 passed
 higgs_compare_one_step self-comparison: ok
 higgs_artifact_check: ok
 checkpoint headers: files=1 tensors=399 bf16=399
 runtime load plan: tensors=399 shard_files=1 bf16_mib=7712 qwen3_backbone=398 higgs_head=1
 ```
 
-The Qwen3 body view was also materialized from the real checkpoint on the 4090
-host:
+The earlier Qwen3 body view was materialized from the real checkpoint on the
+4090 host as a fallback bridge:
 
 ```text
 out_dir: /data/results/pegainfer/higgs-audio/qwen3-body-view
@@ -279,14 +291,15 @@ header_len: 45842
 data_start_mod2: 0
 ```
 
-Header probes from the generated view:
+The preferred config-only alias view was then generated without copying the
+7.5 GiB payload:
 
 ```text
-model.embed_tokens.weight                 BF16 [151936, 2560]
-model.layers.0.self_attn.q_proj.weight    BF16 [4096, 2560]
-model.layers.35.mlp.down_proj.weight      BF16 [2560, 9728]
-model.norm.weight                         BF16 [2560]
-has original Higgs tensor names: false
+out_dir: /data/results/pegainfer/higgs-audio/qwen3-config-view-alias
+config.json: 306 bytes
+generation_config.json: 29 bytes
+higgs-qwen3-tensor-aliases.json: 35 KiB
+aliases: 398
 ```
 
 With FlashInfer headers and its pinned `cccl`, `cutlass`, and `spdlog`
@@ -336,9 +349,9 @@ PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
 cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --bin higgs_dump_one_step_actual -- \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
-  --golden /data/results/pegainfer/higgs-audio/golden/higgs-one-step-golden-18137c4.safetensors \
-  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-18137c4.safetensors
+  --qwen3-config-dir /data/results/pegainfer/higgs-audio/qwen3-config-view-alias \
+  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
+  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-alias-d8dc73e.safetensors
 ```
 
 The dump is schema-valid and uses the committed golden prompt tensors:
@@ -383,7 +396,7 @@ attribution:
 tools/accuracy/analyze_higgs_one_step_actual.py \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
   --golden /data/results/pegainfer/higgs-audio/golden/higgs-one-step-golden-18137c4.safetensors \
-  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-18137c4.safetensors
+  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-alias-d8dc73e.safetensors
 ```
 
 The corrected RTX 4090 D run should be read as a semantic-pass, strict-fail
@@ -517,8 +530,8 @@ upstream issue update:
 
 - Built a one-step Higgs-Audio golden pipeline with prompt tensors, final hidden,
   fused 8-codebook audio logits, top-64 ids/logprobs, and argmax ids.
-- Materialized a Qwen3-compatible view of the Higgs body weights and validated
-  it on RTX 4090 D through the existing PegaInfer Qwen3 runtime path.
+- Added a Qwen3 tensor-name alias weight source so Higgs body weights can be
+  loaded directly from the original checkpoint without a 7.5 GiB renamed copy.
 - Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
   loader; the suspected CUDA RoPE failure was a false-positive.
 - Added strict and semantic comparison modes. Corrected 4090 run passes semantic
@@ -536,15 +549,17 @@ upstream issue update:
 - The generator uses HuggingFace Qwen3 for the backbone and SGLang-Omni semantics
   for prompt/head logic. A later gate should compare directly against a pinned
   SGLang-Omni execution path when the server stack is practical to run.
-- The Rust crate does not yet have a Higgs-owned GPU loader. It locks the
-  golden/artifact contract, materializes a Qwen3-compatible body view, and can
-  dump an actual one-step file through the existing Qwen3 runtime bridge.
+- The Rust crate does not yet have a fully Higgs-owned GPU loader. It locks the
+  golden/artifact contract and can dump an actual one-step file through the
+  existing Qwen3 runtime bridge, now backed by tensor-name aliases instead of a
+  copied body-view payload.
 - The fixture covers one prompt. Wider prompt-length coverage belongs in the next
   parity slice after loader/backbone code exists.
-- The Qwen3 body smoke proves that the Higgs `body.*` tensors can be loaded and
-  executed by the existing Qwen3 runtime after alias materialization. The actual
-  dump now uses the real golden prompt and fused Higgs audio head, but strict
-  hidden/logit/top-64 parity is not yet proven.
+- The Qwen3 body smoke and alias-backed actual dump prove that Higgs `body.*`
+  tensors can be loaded and executed by the existing Qwen3 runtime without
+  rewriting the checkpoint payload. The actual dump now uses the real golden
+  prompt and fused Higgs audio head, but strict hidden/logit/top-64 parity is
+  not yet proven.
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
 - Remote Rust execution can still be blocked by workspace-level git dependencies
@@ -559,10 +574,10 @@ upstream issue update:
 2. If strict parity is required, add deeper stage probes at later layers
    (`14`, `32`, `35`) where accumulated drift is largest, instead of continuing
    to focus on layer 0.
-3. Add a Higgs-owned runtime path that reuses the Qwen3 body tensors without
-   duplicating the safetensors payload into a separate body-view file.
+3. Promote the alias-backed Qwen3 bridge into a cleaner Higgs runtime wrapper
+   so callers no longer think in terms of Qwen3 config/body paths.
 4. Broaden the fixture beyond one prompt: longer text, multiple prompt lengths,
    delay-pattern coverage, and at least one decode/KV-cache continuation.
-5. After correctness gates are accepted, profile the Higgs-owned runtime path
-   with NSYS; use NCU only on hosts where NVIDIA performance counters are
-   unlocked.
+5. After correctness gates are accepted, profile the alias-backed/Higgs-owned
+   runtime path with NSYS; use NCU only on hosts where NVIDIA performance
+   counters are unlocked.
