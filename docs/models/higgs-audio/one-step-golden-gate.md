@@ -140,6 +140,31 @@ single fused Higgs audio head. It is intentionally a pure metadata layer: it doe
 not allocate GPU memory or read tensor payloads yet. The next runtime slice
 should make the GPU loader consume this plan directly.
 
+## Qwen3 Body View
+
+The sixth slice adds a bridge materializer:
+
+```bash
+cargo run -p pegainfer-higgs-audio --bin higgs_materialize_qwen3_body -- \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --out-dir /data/results/pegainfer/higgs-audio/qwen3-body-view
+```
+
+It rewrites the single Higgs safetensors shard into a Qwen3-compatible view:
+
+- `tied.embedding.text_embedding.weight` -> `model.embed_tokens.weight`
+- `body.norm.weight` -> `model.norm.weight`
+- `body.layers.N.*` -> `model.layers.N.*`
+
+The materialized view contains 398 BF16 tensors and excludes the fused Higgs
+audio head. This is a bridge, not the final loader design: it duplicates the
+7.5 GiB body payload so the existing `pegainfer-qwen3-4b` loader can be used
+unchanged while the Higgs-owned loader contract is still being shaped.
+
+The safetensors header is padded so the payload start is aligned for `bf16`.
+Without this, debug Rust aborts inside `DeviceMatrix::from_safetensors` when it
+casts tensor payload bytes to `bf16`.
+
 ## Comparison Gate
 
 The third slice defines the actual runtime parity contract:
@@ -187,7 +212,7 @@ isolation only; it does not replace full workspace CI.
 ## 4090 Bring-Up Notes
 
 The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
-`bc4130b2` on branch `feat/higgs-audio-one-step-golden`.
+`1462955e` on branch `feat/higgs-audio-one-step-golden`.
 
 Static model/golden validation passed on the 4090 host with the Python reference
 environment:
@@ -207,15 +232,83 @@ body_tensors 397
 total_tensors 927
 ```
 
-The Rust isolated Higgs gate and the real checkpoint header gate also passed on
-the 4090 host:
+The Rust isolated Higgs gate and the real checkpoint header gate passed on the
+4090 host:
 
 ```text
-isolated Higgs tests: 10 passed
+isolated Higgs tests: 14 passed
 higgs_compare_one_step self-comparison: ok
 higgs_artifact_check: ok
 checkpoint headers: files=1 tensors=399 bf16=399
 runtime load plan: tensors=399 shard_files=1 bf16_mib=7712 qwen3_backbone=398 higgs_head=1
+```
+
+The Qwen3 body view was also materialized from the real checkpoint on the 4090
+host:
+
+```text
+out_dir: /data/results/pegainfer/higgs-audio/qwen3-body-view
+tensors: 398
+payload_mib: 7672
+model.safetensors size: 8044982042 bytes
+header_len: 45842
+data_start_mod2: 0
+```
+
+Header probes from the generated view:
+
+```text
+model.embed_tokens.weight                 BF16 [151936, 2560]
+model.layers.0.self_attn.q_proj.weight    BF16 [4096, 2560]
+model.layers.35.mlp.down_proj.weight      BF16 [2560, 9728]
+model.norm.weight                         BF16 [2560]
+has original Higgs tensor names: false
+```
+
+With FlashInfer headers and its pinned `cccl`, `cutlass`, and `spdlog`
+third-party trees restored, the existing Qwen3 runtime successfully loaded the
+materialized Higgs body view and completed a minimal prefill + decode smoke:
+
+```bash
+PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
+cargo run --release -p pegainfer-qwen3-4b --bin qwen3_decode_context -- \
+  --model-path /data/results/pegainfer/higgs-audio/qwen3-body-view \
+  --contexts 1,16,128 \
+  --iters 3 \
+  --disable-cuda-graph
+```
+
+Observed release decode timings on RTX 4090 D:
+
+```text
+prompt_context,kv_len_during_decode,iters,avg_ms,p50_ms,p90_ms,min_ms,max_ms
+1,2,3,9.6083,9.6299,9.6503,9.5446,9.6503
+16,17,3,9.5781,9.5664,9.6115,9.5563,9.6115
+128,129,3,9.7341,9.7195,9.7664,9.7163,9.7664
+```
+
+An NSYS CUDA/NVTX/CUBLAS profile for context 16 was captured at:
+
+```text
+/data/results/pegainfer/higgs-audio/profiles/qwen3-body-c16.nsys-rep
+```
+
+`nsys stats` shows the two profiled decode steps are dominated by cuBLAS GEMV
+kernels:
+
+```text
+cuBLAS/internal gemvx kernels: 95.1% of captured GPU kernel time
+FlashInfer BatchDecodeWithPagedKVCacheKernel: 1.0%
+FusedAddRMSNormRoundKernel: 1.4%
+AppendPagedKVCacheKernel: 0.6%
+```
+
+NCU is installed (`2025.1.0.0`) but cannot collect GPU performance counters on
+this host:
+
+```text
+ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU
+Performance Counters on the target device 0.
 ```
 
 Environment notes:
@@ -224,6 +317,14 @@ Environment notes:
 - Rust nightly is installed under `/root/.cargo/bin`, observed as
   `rustc 1.99.0-nightly`.
 - Cargo uses `rsproxy.cn` sparse registry for crates.io.
+- CUDA toolkit is 12.8 (`nvcc V12.8.61`).
+- FlashInfer was restored from the pinned submodule commit
+  `d768c14e7cf5dd5df45a8a1de78ae815879f108a` using tarballs, because a direct
+  submodule clone through `gh-proxy.com` stalled. The pinned internal dependency
+  commits used were:
+  - `NVIDIA/cccl`: `876867684f7fac130e0f5911236e0a92a970d4fd`
+  - `NVIDIA/cutlass`: `b46b16d003484063bca4ed365e44095c4c6ed633`
+  - `gabime/spdlog`: `c3aed4b68373955e1cc94307683d44dca1515d2b`
 - Direct `git clone --filter=blob:none --no-checkout
   https://github.com/vllm-project/vllm.git` failed with GitHub transfer too
   slow.
@@ -244,12 +345,17 @@ Environment notes:
   for prompt/head logic. A later gate should compare directly against a pinned
   SGLang-Omni execution path when the server stack is practical to run.
 - The Rust crate does not yet load Higgs weights or execute the transformer. It
-  only locks the golden/artifact contract.
+  locks the golden/artifact contract and can materialize a Qwen3-compatible body
+  view for the existing Qwen3 runtime.
 - The fixture covers one prompt. Wider prompt-length coverage belongs in the next
   parity slice after loader/backbone code exists.
 - The generator captures `final_hidden.bf16`, but the first Rust test does not
   compare PegaInfer hidden states yet; the comparator now defines the check, but
-  no PegaInfer runtime dump exists yet.
+  no PegaInfer Higgs runtime dump exists yet.
+- The Qwen3 body smoke proves that the Higgs `body.*` tensors can be loaded and
+  executed by the existing Qwen3 runtime after alias materialization. It does not
+  yet prove golden parity, because the current smoke uses synthetic Qwen3 token
+  ids and does not apply the fused Higgs audio head.
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
 - Remote Rust execution can still be blocked by workspace-level git dependencies
@@ -259,12 +365,15 @@ Environment notes:
 
 ## Next Execution Slice
 
-1. Add `HiggsConfig` and tensor-manifest parsing.
-2. Load the pinned checkpoint's `body.*`, text embedding, and fused modality
-   embedding/head.
-3. Reuse the current Qwen3 backbone operator path for zero-shot prefill.
-4. Dump PegaInfer `final_hidden.bf16`, `[8, 1026]` audio logits, top-64
+1. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
+   the safetensors payload.
+2. Run the golden prompt through PegaInfer with the committed prompt ids instead
+   of synthetic Qwen3 token ids.
+3. Expose or dump the final hidden vector from the Qwen3 body path.
+4. Load/apply `tied.embedding.modality_embeddings.0.embedding.weight` as the
+   fused Higgs audio head.
+5. Dump PegaInfer `final_hidden.bf16`, `[8, 1026]` audio logits, top-64
    logprobs, and argmax ids into the comparator schema.
-5. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
+6. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
    fixture with calibrated bf16 tolerances.
-6. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
+7. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
