@@ -74,6 +74,31 @@ a9c23650c0e9a39ee2b314f1dead7c7d2fd8adfe77c312b198b6e2e6b3d91471
 This is intentionally narrower than the future #395 gate. It prevents silent
 fixture drift while the model crate is being built.
 
+## Artifact Gate
+
+The second slice adds config and manifest validation around the same fixture:
+
+```bash
+cargo run -p pegainfer-higgs-audio --bin higgs_artifact_check -- \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --golden test_data/higgs-one-step-audio-logits.safetensors
+```
+
+This check is deliberately static. It proves the local checkpoint directory,
+weight manifest, and committed golden agree before runtime code is allowed to
+depend on them:
+
+- `config.json`, `tokenizer.json`, and `model.safetensors.index.json` hashes must
+  match fixture metadata.
+- Higgs text config must match the pinned Qwen3 body shape: 36 layers, hidden
+  2560, 32 query heads, 8 KV heads, head dim 128, intermediate 9728.
+- Higgs audio config must be the discrete 8-codebook, 1026-vocab,
+  delay-pattern modality used by the golden.
+- The manifest must expose `body.*`, text embedding, and the fused modality
+  embedding/head at `tied.embedding.modality_embeddings.0.embedding.weight`.
+- The expected KV footprint is 144 KiB per position, or 1152 MiB for 8192
+  positions in bf16.
+
 ## Technical Debt
 
 - The branch commits a derived fixture from a research/non-commercial model. This
@@ -83,13 +108,17 @@ fixture drift while the model crate is being built.
   for prompt/head logic. A later gate should compare directly against a pinned
   SGLang-Omni execution path when the server stack is practical to run.
 - The Rust crate does not yet load Higgs weights or execute the transformer. It
-  only locks the golden contract.
+  only locks the golden/artifact contract.
 - The fixture covers one prompt. Wider prompt-length coverage belongs in the next
   parity slice after loader/backbone code exists.
 - The generator captures `final_hidden.bf16`, but the first Rust test does not
   compare PegaInfer hidden states yet.
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
+- Remote Rust execution can still be blocked by workspace-level git dependencies
+  such as `vllm-project/vllm.git`; when that happens, run local Rust gates and
+  keep remote checks focused on Python fixture/model-hash validation until the
+  mirror/cache policy is fixed.
 
 ## Next Execution Slice
 

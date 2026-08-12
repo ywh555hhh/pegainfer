@@ -5322,6 +5322,8 @@ name = "pegainfer-higgs-audio"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
+ "half",
  "safetensors",
  "serde_json",
  "sha2 0.11.0",
