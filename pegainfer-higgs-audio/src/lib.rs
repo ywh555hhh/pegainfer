@@ -7,5 +7,6 @@
 
 pub mod compare;
 pub mod config;
+pub mod load_plan;
 pub mod one_step_golden;
 pub mod weights;

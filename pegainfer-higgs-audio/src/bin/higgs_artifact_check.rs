@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use pegainfer_higgs_audio::config::{EXPECTED_MODEL_CARD_CONTEXT, HiggsConfig};
+use pegainfer_higgs_audio::load_plan::HiggsRuntimeLoadPlan;
 use pegainfer_higgs_audio::one_step_golden::{self, REQUIRED_TENSORS};
 use pegainfer_higgs_audio::weights::{
     HiggsWeightManifest, fused_modality_shape, validate_checkpoint_headers,
@@ -24,6 +25,8 @@ fn main() -> Result<()> {
     let config = HiggsConfig::from_model_dir(&args.model_dir)?;
     let manifest = HiggsWeightManifest::from_model_dir(&args.model_dir)?;
     let summary = manifest.validate_for_config(&config)?;
+    let load_plan = HiggsRuntimeLoadPlan::from_manifest(&config, &manifest)?;
+    let load_summary = load_plan.summary();
     let header_summary = validate_checkpoint_headers(&args.model_dir, &config, &manifest)?;
     let golden = one_step_golden::load_and_validate(&args.golden)?;
 
@@ -77,6 +80,14 @@ fn main() -> Result<()> {
         header_summary.files_checked,
         header_summary.tensors_checked,
         header_summary.bf16_tensors_checked
+    );
+    println!(
+        "  runtime load plan: tensors={} shard_files={} bf16_mib={} qwen3_backbone={} higgs_head={}",
+        load_summary.tensors,
+        load_summary.shard_files,
+        load_summary.bf16_bytes / 1024 / 1024,
+        load_summary.qwen3_backbone_tensors,
+        load_summary.higgs_head_tensors
     );
 
     Ok(())

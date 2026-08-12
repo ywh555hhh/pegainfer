@@ -124,6 +124,22 @@ This proves the checkpoint is not merely named correctly in
 `model.safetensors.index.json`; the actual safetensors shard header must agree
 with the Higgs/Qwen3 loader contract.
 
+## Runtime Load Plan
+
+The fifth slice adds `HiggsRuntimeLoadPlan`, a model-owned mapping from checkpoint
+tensor names to the future loader slots:
+
+- `tied.embedding.text_embedding.weight` -> `qwen3.embed_tokens`
+- `body.norm.weight` -> `qwen3.norm`
+- `body.layers.N.*` -> `qwen3.layers.N.*`
+- `tied.embedding.modality_embeddings.0.embedding.weight` ->
+  `higgs.fused_audio_head`
+
+The plan currently covers 399 BF16 tensors: 398 Qwen3 backbone tensors plus the
+single fused Higgs audio head. It is intentionally a pure metadata layer: it does
+not allocate GPU memory or read tensor payloads yet. The next runtime slice
+should make the GPU loader consume this plan directly.
+
 ## Comparison Gate
 
 The third slice defines the actual runtime parity contract:
