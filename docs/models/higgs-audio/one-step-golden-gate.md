@@ -386,11 +386,12 @@ An NSYS profile for the Higgs-owned one-step actual dump was captured after the
 auto alias-view path landed:
 
 ```text
-/data/results/pegainfer/higgs-audio/profiles/higgs-one-step-actual-auto-a8652dc.nsys-rep
-profile size: 145 KiB
-profiled actual: /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-a8652dc-profiled.safetensors
+/data/results/pegainfer/higgs-audio/profiles/higgs-one-step-actual-auto-a514447.nsys-rep
+/data/results/pegainfer/higgs-audio/profiles/higgs-one-step-actual-auto-a514447-stats_cuda_gpu_kern_sum.csv
+profile size: 144 KiB
+profiled actual: /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-a514447-profiled.safetensors
 profiled actual size: 44 KiB
-semantic comparison: ok
+gate semantic comparison: ok
 ```
 
 The `nsys stats --report cuda_gpu_kern_sum` summary shows the one-step path is
@@ -420,7 +421,7 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label bb14a58
+  --label a514447
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
@@ -433,19 +434,19 @@ config view. It then parses that summary with
 markers, SM/NVCC settings, and non-empty artifact paths. Add `--profile` to
 capture an NSYS report for the same actual-dump path.
 
-The script was validated on the 4090-D host at `bb14a58` after the retained
+The script was validated on the 4090-D host at `a514447` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
 request-id guard, persisted session-smoke log, explicit persisted-marker
 assertions, non-empty artifact assertions, and key-value gate summary landed,
 producing the complete gate artifact set:
 
 ```text
-actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-bb14a58.safetensors
-session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-bb14a58.safetensors
-compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-bb14a58.txt
-smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-bb14a58.txt
-session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-bb14a58.txt
-summary:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-cuda-gate-bb14a58.txt
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-a514447.safetensors
+session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-a514447.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-a514447.txt
+smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-a514447.txt
+session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-a514447.txt
+summary:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-cuda-gate-a514447.txt
 semantic comparison: ok
 session semantic comparison: ok
 duplicate_request_id_guard: ok
@@ -461,17 +462,17 @@ The persisted key-value summary for that run is:
 ```text
 status=ok
 repo=/data/src/pegainfer
-commit=bb14a589
-label=bb14a58
+commit=a514447d
+label=a514447
 model_dir=/data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561
 golden=/data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors
 sm=89
 nvcc_jobs=8
-actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-bb14a58.safetensors
-session_actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-bb14a58.safetensors
-compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-bb14a58.txt
-session_smoke_log=/data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-bb14a58.txt
-session_compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-bb14a58.txt
+actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-a514447.safetensors
+session_actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-a514447.safetensors
+compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-a514447.txt
+session_smoke_log=/data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-a514447.txt
+session_compare_log=/data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-a514447.txt
 auto_view=/data/results/pegainfer/higgs-audio/actual/higgs-qwen3-config-view
 semantic_comparison=ok
 session_semantic_comparison=ok
@@ -482,7 +483,7 @@ artifacts_nonempty=ok
 The summary checker also passed on the 4090-D run:
 
 ```text
-higgs gate summary: ok commit=bb14a589 label=bb14a58 sm=89
+higgs gate summary: ok commit=a514447d label=a514447 sm=89
 ```
 
 The session smoke retains the prompt KV under request id `1`, emits the same
