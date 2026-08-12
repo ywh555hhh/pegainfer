@@ -382,6 +382,45 @@ impl Qwen3Model {
         Ok((logits_vec, all_logits))
     }
 
+    /// Run a single prompt prefill and return the final RMSNorm'ed hidden state
+    /// for the last prompt token.
+    ///
+    /// This is a narrow diagnostic hook for model-local golden generation. It
+    /// deliberately bypasses sampling and logits so downstream multimodal heads
+    /// can compare the exact hidden-state contract they consume.
+    pub(crate) fn prefill_last_normed_hidden(
+        &self,
+        prompt: &[u32],
+        kv_view: &KvView,
+        kv_buffer: &CudaSlice<bf16>,
+        layout: &KvLayout,
+    ) -> Result<DeviceVec> {
+        anyhow::ensure!(!prompt.is_empty(), "prompt must not be empty");
+
+        let hidden = self.get_embeddings_batch(prompt)?;
+        let start_position = kv_view.seq_len() - prompt.len();
+        let plan = PrefillPagedPlan::from_raw_batch_with_cta_tile_q(
+            &self.ctx,
+            &[kv_view.page_indices().to_vec()],
+            &[kv_view.last_page_len()],
+            &[start_position],
+            &[prompt.len()],
+            self.local_num_attention_heads(),
+            self.local_num_key_value_heads(),
+            self.config.head_dim,
+            PREFILL_ATTENTION_CTA_TILE_Q,
+        )?;
+
+        let hidden = self.process_all_layers_batch_multi(hidden, layout, kv_buffer, &plan)?;
+        let last_hidden = ops::extract_vec(&self.ctx, &hidden, prompt.len() - 1)?;
+        ops::rms_norm(
+            &self.ctx,
+            &last_hidden,
+            &self.norm,
+            self.config.rms_norm_eps,
+        )
+    }
+
     fn process_all_layers_batch_multi(
         &self,
         mut hidden: HiddenStates,

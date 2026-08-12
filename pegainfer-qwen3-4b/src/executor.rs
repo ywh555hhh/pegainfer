@@ -219,6 +219,16 @@ fn execute_step_on_lane(
                 Ok(WorkerStepOutcome::Ack)
             }
         }
+        StepCommand::PrefillLastHidden { prompt, kv_view } => {
+            let hidden = lane.execute_prefill_last_hidden(prompt, kv_view)?;
+            if collect_result {
+                Ok(WorkerStepOutcome::PrefillHidden(PrefillHiddenResult {
+                    hidden_bf16: hidden,
+                }))
+            } else {
+                Ok(WorkerStepOutcome::Ack)
+            }
+        }
         StepCommand::Unified {
             prefill_requests,
             prefill_kv_views,
@@ -392,6 +402,11 @@ pub struct DecodeResult {
 pub struct UnifiedResult {
     pub prefill_requests: Vec<PrefillRequestResult>,
     pub decode_requests: Vec<DecodeRequestResult>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PrefillHiddenResult {
+    pub hidden_bf16: Vec<half::bf16>,
 }
 
 pub(crate) trait ModelExecutor: Send {
@@ -630,6 +645,35 @@ impl Qwen3Executor {
 
     pub fn execute_unified(&mut self, plan: UnifiedPlan<'_>) -> Result<UnifiedResult> {
         <Self as ModelExecutor>::execute_unified(self, plan)
+    }
+
+    pub fn prefill_last_hidden_bf16(
+        &mut self,
+        prompt_tokens: Vec<u32>,
+    ) -> Result<PrefillHiddenResult> {
+        anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
+        let mut rkv = self.kv_mgr.new_request(
+            prompt_tokens.clone(),
+            1,
+            self.active_lora_adapter.as_deref(),
+        );
+        rkv.schedule_prefill(prompt_tokens.len(), &self.kv_mgr)
+            .map_err(|e| {
+                anyhow::anyhow!("schedule_prefill failed for diagnostic hidden dump: {e}")
+            })?;
+        let kv_view = rkv.prefill_view(prompt_tokens.len());
+        let step = StepCommand::PrefillLastHidden {
+            prompt: prompt_tokens,
+            kv_view,
+        };
+        let outcome = self.run_step(&step)?;
+        match outcome {
+            WorkerStepOutcome::PrefillHidden(result) => Ok(result),
+            other => Err(anyhow::anyhow!(
+                "prefill hidden returned unexpected: {}",
+                other.kind()
+            )),
+        }
     }
 
     pub fn activate_lora_adapter(&mut self, adapter: Option<&str>) -> Result<()> {
@@ -1186,6 +1230,27 @@ impl LocalQwen3Lane {
         )
     }
 
+    fn execute_prefill_last_hidden(
+        &mut self,
+        prompt: &[u32],
+        kv_view: &KvView,
+    ) -> Result<Vec<half::bf16>> {
+        let hidden = self.model.prefill_last_normed_hidden(
+            prompt,
+            kv_view,
+            self.kv_buffer.buffer(),
+            &self.layout,
+        )?;
+        let host = self
+            .model
+            .device_ctx()
+            .stream
+            .clone_dtoh(&hidden.data)
+            .map_err(|e| anyhow::anyhow!("D2H hidden copy failed: {e}"))?;
+        self.model.device_ctx().sync()?;
+        Ok(host)
+    }
+
     fn execute_decode(&mut self, token_ids: &[u32], kv_views: &[KvView]) -> Result<()> {
         self.model.batch_decode(
             token_ids,
@@ -1251,6 +1316,10 @@ enum StepCommand {
         decode_requests: Vec<DecodeStepItem>,
         decode_kv_views: Vec<KvView>,
     },
+    PrefillLastHidden {
+        prompt: Vec<u32>,
+        kv_view: KvView,
+    },
 }
 
 impl StepCommand {
@@ -1259,6 +1328,7 @@ impl StepCommand {
             Self::Prefill { .. } => "prefill",
             Self::Decode { .. } => "decode",
             Self::Unified { .. } => "unified",
+            Self::PrefillLastHidden { .. } => "prefill_hidden",
         }
     }
 }
@@ -1291,6 +1361,7 @@ enum WorkerStepOutcome {
     Prefill(PrefillResult),
     Decode(DecodeResult),
     Unified(UnifiedResult),
+    PrefillHidden(PrefillHiddenResult),
 }
 
 impl WorkerStepOutcome {
@@ -1300,6 +1371,7 @@ impl WorkerStepOutcome {
             Self::Prefill(_) => "prefill",
             Self::Decode(_) => "decode",
             Self::Unified(_) => "unified",
+            Self::PrefillHidden(_) => "prefill_hidden",
         }
     }
 }

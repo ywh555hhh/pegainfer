@@ -7,6 +7,18 @@ tmp_root="${TMPDIR:-/tmp}/pegainfer-higgs-isolated"
 rm -rf "$tmp_root"
 mkdir -p "$tmp_root"
 cp -R "$repo_root/pegainfer-higgs-audio" "$tmp_root/pegainfer-higgs-audio"
+python3 - <<'PY' "$tmp_root/pegainfer-higgs-audio/Cargo.toml"
+import re
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+text = re.sub(r'^pegainfer-qwen3-4b = .*\n', '', text, flags=re.MULTILINE)
+text = re.sub(r'\n\[features\]\nruntime-qwen3 = .*\n', '\n', text)
+text = re.sub(r'\n\[\[bin\]\]\nname = "higgs_dump_one_step_actual"\npath = "src/bin/higgs_dump_one_step_actual.rs"\nrequired-features = \["runtime-qwen3"\]\n', '\n', text)
+path.write_text(text)
+PY
+rm -f "$tmp_root/pegainfer-higgs-audio/src/bin/higgs_dump_one_step_actual.rs"
 mkdir -p "$tmp_root/test_data"
 cp "$repo_root/test_data/higgs-one-step-audio-logits.safetensors" "$tmp_root/test_data/"
 
@@ -24,6 +36,7 @@ license = "Apache-2.0"
 anyhow = "1.0"
 clap = { version = "4.6.1", features = ["derive"] }
 half = { version = "2.7", features = ["num-traits"] }
+memmap2 = "0.9"
 safetensors = "0.7"
 serde_json = "1.0.149"
 sha2 = "0.11"

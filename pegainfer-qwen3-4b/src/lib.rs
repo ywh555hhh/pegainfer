@@ -26,9 +26,9 @@ pub use kernel_plan::kernel_plan;
 /// model-local benchmarks. The root server should use `start_engine` instead.
 pub mod runtime {
     pub use crate::executor::{
-        DecodePlan, DecodeRequestResult, DecodeResult, DecodeStepItem, PrefillPlan,
-        PrefillRequestResult, PrefillResult, PrefillStepItem, Qwen3Executor, RequestId,
-        UnifiedPlan, UnifiedResult,
+        DecodePlan, DecodeRequestResult, DecodeResult, DecodeStepItem, PrefillHiddenResult,
+        PrefillPlan, PrefillRequestResult, PrefillResult, PrefillStepItem, Qwen3Executor,
+        RequestId, UnifiedPlan, UnifiedResult,
     };
 }
 

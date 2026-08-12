@@ -8,12 +8,22 @@ license.workspace = true
 anyhow = { workspace = true }
 clap = { workspace = true }
 half = { workspace = true }
+memmap2 = { workspace = true }
+pegainfer-qwen3-4b = { workspace = true, optional = true }
 safetensors = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 
+[features]
+runtime-qwen3 = ["dep:pegainfer-qwen3-4b"]
+
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[[bin]]
+name = "higgs_dump_one_step_actual"
+path = "src/bin/higgs_dump_one_step_actual.rs"
+required-features = ["runtime-qwen3"]
 
 [lints]
 workspace = true
