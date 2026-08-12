@@ -303,6 +303,87 @@ FusedAddRMSNormRoundKernel: 1.4%
 AppendPagedKVCacheKernel: 0.6%
 ```
 
+## Runtime Actual Dump
+
+The current branch also has a Qwen3-backed Higgs one-step actual path:
+
+```bash
+PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
+cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
+  --bin higgs_dump_one_step_actual -- \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
+  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
+  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual.safetensors
+```
+
+The dump is schema-valid and uses the committed golden prompt tensors:
+
+```text
+higgs one-step actual dump: ok
+  prompt_tokens: 10
+  hidden_values: 2560
+  audio_logits: 8208
+```
+
+Strict actual-vs-golden comparison does **not** pass yet:
+
+```text
+prompt.input_ids_padded          pass=true
+prompt.attention_mask            pass=true
+prompt.lengths                   pass=true
+final_hidden.bf16                pass=false max_abs=0.500000 mean_abs=0.044455 p99_abs=0.156250
+audio_logits.f32                 pass=false max_abs=2.868027 mean_abs=0.328455 p99_abs=1.160721
+audio_top64.ids                  pass=false exact_mismatch=481
+audio_top64.logprobs.f32         pass=false mean_abs=1.937258 p99_abs=3.526810
+audio_argmax.ids                 pass=true
+```
+
+The useful interpretation is narrower than "pass" but still strong:
+
+- Prompt tensors are exact, so the runtime is replaying the intended Higgs
+  one-step prompt.
+- `final_hidden.bf16` has high directional agreement with the Transformers
+  golden (`cos=0.999898791`), but the absolute drift is larger than the current
+  hidden tolerance.
+- All 8 audio argmax ids match. The top-1 audio code for every codebook is
+  stable even though top-64 ordering is tie/noise sensitive.
+- Top-64 overlap by codebook is `[58, 51, 46, 46, 46, 53, 51, 57]`; exact
+  top-64 id equality is too brittle for the current bf16 runtime path.
+
+A new diagnostic script captures these checks and the audio-head dtype
+attribution:
+
+```bash
+tools/accuracy/analyze_higgs_one_step_actual.py \
+  --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
+  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
+  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual.safetensors
+```
+
+On the RTX 4090 D run, this separates the logits drift into two effects:
+
+```text
+final_hidden.bf16: max=0.500000 mean=0.044455 p99=0.152792 rmse=0.059135 cos=0.999898791
+audio_logits.f32:  max=2.868027 mean=0.328455 p99=1.160617 rmse=0.419817 cos=0.999994040
+
+cpu_f32_from_golden_hidden_vs_golden_logits:
+  max=0.484344 mean=0.108543 p99=0.247003
+cuda_bf16_from_golden_hidden_vs_golden_logits:
+  max=0.000000 mean=0.000000 p99=0.000000
+cuda_bf16_from_actual_hidden_vs_golden_logits:
+  max=3.000000 mean=0.310353 p99=1.250000
+actual_hidden_effect_cuda_bf16:
+  max=3.000000 mean=0.310353 p99=1.250000
+```
+
+This proves the golden audio head is CUDA bf16 `F.linear`, while the current Rust
+actual writer computes audio logits with a CPU fp32 dot product. That CPU fp32
+implementation alone accounts for about `0.109` mean logit delta even when the
+golden hidden is used. The remaining larger drift comes from the Qwen3 body
+runtime hidden state and should be investigated separately before widening
+tolerances.
+
 NCU is installed (`2025.1.0.0`) but cannot collect GPU performance counters on
 this host:
 
@@ -344,18 +425,15 @@ Environment notes:
 - The generator uses HuggingFace Qwen3 for the backbone and SGLang-Omni semantics
   for prompt/head logic. A later gate should compare directly against a pinned
   SGLang-Omni execution path when the server stack is practical to run.
-- The Rust crate does not yet load Higgs weights or execute the transformer. It
-  locks the golden/artifact contract and can materialize a Qwen3-compatible body
-  view for the existing Qwen3 runtime.
+- The Rust crate does not yet have a Higgs-owned GPU loader. It locks the
+  golden/artifact contract, materializes a Qwen3-compatible body view, and can
+  dump an actual one-step file through the existing Qwen3 runtime bridge.
 - The fixture covers one prompt. Wider prompt-length coverage belongs in the next
   parity slice after loader/backbone code exists.
-- The generator captures `final_hidden.bf16`, but the first Rust test does not
-  compare PegaInfer hidden states yet; the comparator now defines the check, but
-  no PegaInfer Higgs runtime dump exists yet.
 - The Qwen3 body smoke proves that the Higgs `body.*` tensors can be loaded and
-  executed by the existing Qwen3 runtime after alias materialization. It does not
-  yet prove golden parity, because the current smoke uses synthetic Qwen3 token
-  ids and does not apply the fused Higgs audio head.
+  executed by the existing Qwen3 runtime after alias materialization. The actual
+  dump now uses the real golden prompt and fused Higgs audio head, but strict
+  hidden/logit/top-64 parity is not yet proven.
 - Nsight Compute counters are blocked on the current 4090 host because
   `RmProfilingAdminOnly=1`; NSYS works.
 - Remote Rust execution can still be blocked by workspace-level git dependencies
@@ -365,15 +443,14 @@ Environment notes:
 
 ## Next Execution Slice
 
-1. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
+1. Replace the CPU fp32 audio-head dot in the Rust actual writer with a GPU bf16
+   linear path, or make the fixture explicitly target CPU fp32 logits.
+2. Diagnose the remaining Qwen3-body hidden drift by comparing the Higgs prompt
+   against a Transformers dump at intermediate layer boundaries.
+3. Update the comparator so top-64 ids use overlap/regret-style reporting rather
+   than exact equality, while keeping `audio_argmax.ids` exact.
+4. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
    the safetensors payload.
-2. Run the golden prompt through PegaInfer with the committed prompt ids instead
-   of synthetic Qwen3 token ids.
-3. Expose or dump the final hidden vector from the Qwen3 body path.
-4. Load/apply `tied.embedding.modality_embeddings.0.embedding.weight` as the
-   fused Higgs audio head.
-5. Dump PegaInfer `final_hidden.bf16`, `[8, 1026]` audio logits, top-64
-   logprobs, and argmax ids into the comparator schema.
-6. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
+5. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
    fixture with calibrated bf16 tolerances.
-7. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
+6. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
