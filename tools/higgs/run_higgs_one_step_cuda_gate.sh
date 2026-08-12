@@ -25,6 +25,7 @@ Outputs:
   <result-root>/actual/semantic-compare-auto-<label>.txt
   <result-root>/actual/higgs-prompt-session-smoke-<label>.txt
   <result-root>/actual/semantic-compare-session-auto-<label>.txt
+  <result-root>/actual/higgs-one-step-cuda-gate-<label>.txt
   <result-root>/actual/higgs-qwen3-config-view/
   <result-root>/profiles/higgs-one-step-actual-auto-<label>.nsys-rep when --profile is set
 USAGE
@@ -112,6 +113,7 @@ session_actual="$actual_dir/higgs-one-step-session-cuda-bf16-auto-$label.safeten
 compare_log="$actual_dir/semantic-compare-auto-$label.txt"
 session_smoke_log="$actual_dir/higgs-prompt-session-smoke-$label.txt"
 session_compare_log="$actual_dir/semantic-compare-session-auto-$label.txt"
+gate_summary="$actual_dir/higgs-one-step-cuda-gate-$label.txt"
 auto_view="$actual_dir/higgs-qwen3-config-view"
 
 mkdir -p "$actual_dir" "$profile_dir"
@@ -130,6 +132,7 @@ echo "session:     $session_actual"
 echo "compare_log: $compare_log"
 echo "smoke_log:   $session_smoke_log"
 echo "session_log: $session_compare_log"
+echo "summary:     $gate_summary"
 echo "sm:          $PEGAINFER_CUDA_SM"
 echo "nvcc_jobs:   $PEGAINFER_NVCC_JOBS"
 
@@ -177,6 +180,30 @@ require_nonempty_file "$auto_view/higgs-qwen3-tensor-aliases.json"
 
 echo "==> Auto config view"
 find "$auto_view" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+
+cat >"$gate_summary" <<SUMMARY
+status=ok
+repo=$repo_root
+commit=$(git -C "$repo_root" rev-parse --short HEAD)
+label=$label
+model_dir=$model_dir
+golden=$golden
+sm=$PEGAINFER_CUDA_SM
+nvcc_jobs=$PEGAINFER_NVCC_JOBS
+actual=$actual
+session_actual=$session_actual
+compare_log=$compare_log
+session_smoke_log=$session_smoke_log
+session_compare_log=$session_compare_log
+auto_view=$auto_view
+semantic_comparison=ok
+session_semantic_comparison=ok
+duplicate_request_id_guard=ok
+artifacts_nonempty=ok
+SUMMARY
+require_nonempty_file "$gate_summary"
+echo "==> Gate summary"
+cat "$gate_summary"
 
 if [[ "$profile" -eq 1 ]]; then
   if ! command -v nsys >/dev/null 2>&1; then

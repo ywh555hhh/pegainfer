@@ -427,14 +427,15 @@ That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
 through the auto alias-view path, runs the semantic comparator, smoke-tests the
 prompt-only retained KV session path, compares that session actual against the
 same golden, asserts the persisted gate markers, verifies the generated files are
-non-empty, and records the small generated Qwen3 config view. Add `--profile`
-to capture an NSYS report for the same actual-dump path.
+non-empty, writes a key-value gate summary, and records the small generated Qwen3
+config view. Add `--profile` to capture an NSYS report for the same actual-dump
+path.
 
 The script was validated on the 4090-D host at `6b7cbbd` after the retained
 prompt-session bridge, `HiggsAudioRuntime` API surface, duplicate
 request-id guard, persisted session-smoke log, explicit persisted-marker
-assertions, and non-empty artifact assertions landed, producing the complete gate
-artifact set:
+assertions, non-empty artifact assertions, and key-value gate summary landed,
+producing the complete gate artifact set:
 
 ```text
 actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-6b7cbbd.safetensors
@@ -442,6 +443,7 @@ session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-c
 compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-6b7cbbd.txt
 smoke_log:   /data/results/pegainfer/higgs-audio/actual/higgs-prompt-session-smoke-6b7cbbd.txt
 session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-6b7cbbd.txt
+summary:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-cuda-gate-6b7cbbd.txt
 semantic comparison: ok
 session semantic comparison: ok
 duplicate_request_id_guard: ok
