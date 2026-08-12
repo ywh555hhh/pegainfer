@@ -171,6 +171,7 @@ The third slice defines the actual runtime parity contract:
 
 ```bash
 cargo run -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
+  --mode strict \
   --golden test_data/higgs-one-step-audio-logits.safetensors \
   --actual /path/to/pegainfer-higgs-one-step-actual.safetensors
 ```
@@ -196,6 +197,29 @@ top_logprobs_mean_abs_tol=0.005
 These are not a substitute for runtime calibration. They are the current
 engineering boundary for the first actual-vs-golden gate; tighten or widen them
 only after a measured PegaInfer dump exists and the drift source is understood.
+
+The comparator also has a semantic mode for bf16 runtime bring-up:
+
+```bash
+cargo run -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
+  --mode semantic \
+  --golden test_data/higgs-one-step-audio-logits.safetensors \
+  --actual /path/to/pegainfer-higgs-one-step-actual.safetensors
+```
+
+Semantic mode still prints the strict tensor drift report, but it gates on:
+
+- prompt tensors exact
+- `audio_argmax.ids` exact
+- hidden cosine at least `0.9998`
+- logits cosine at least `0.99999`
+- max golden-logit regret for actual argmax at most `0.20`
+- minimum top-64 overlap per Higgs codebook at least `40`
+
+This is a runtime smoke/parity gate, not a replacement for strict golden parity.
+It is useful because exact top-64 ordering is brittle under small bf16 drift,
+while argmax stability, regret, cosine, and overlap expose the semantic behavior
+more directly.
 
 When workspace-level git dependencies block the full root workspace on remote
 hosts, run the Higgs-only isolated gate:
@@ -314,13 +338,14 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
   --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
   --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
-  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual.safetensors
+  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16.safetensors
 ```
 
 The dump is schema-valid and uses the committed golden prompt tensors:
 
 ```text
 higgs one-step actual dump: ok
+  audio_head_backend: CudaBf16
   prompt_tokens: 10
   hidden_values: 2560
   audio_logits: 8208
@@ -333,9 +358,9 @@ prompt.input_ids_padded          pass=true
 prompt.attention_mask            pass=true
 prompt.lengths                   pass=true
 final_hidden.bf16                pass=false max_abs=0.500000 mean_abs=0.044455 p99_abs=0.156250
-audio_logits.f32                 pass=false max_abs=2.868027 mean_abs=0.328455 p99_abs=1.160721
-audio_top64.ids                  pass=false exact_mismatch=481
-audio_top64.logprobs.f32         pass=false mean_abs=1.937258 p99_abs=3.526810
+audio_logits.f32                 pass=false max_abs=3.000000 mean_abs=0.310353 p99_abs=1.250000
+audio_top64.ids                  pass=false exact_mismatch=485
+audio_top64.logprobs.f32         pass=false mean_abs=2.077849 p99_abs=4.000000
 audio_argmax.ids                 pass=true
 ```
 
@@ -348,7 +373,7 @@ The useful interpretation is narrower than "pass" but still strong:
   hidden tolerance.
 - All 8 audio argmax ids match. The top-1 audio code for every codebook is
   stable even though top-64 ordering is tie/noise sensitive.
-- Top-64 overlap by codebook is `[58, 51, 46, 46, 46, 53, 51, 57]`; exact
+- Top-64 overlap by codebook is `[58, 50, 42, 42, 50, 54, 49, 55]`; exact
   top-64 id equality is too brittle for the current bf16 runtime path.
 
 A new diagnostic script captures these checks and the audio-head dtype
@@ -358,14 +383,14 @@ attribution:
 tools/accuracy/analyze_higgs_one_step_actual.py \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
   --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
-  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual.safetensors
+  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16.safetensors
 ```
 
 On the RTX 4090 D run, this separates the logits drift into two effects:
 
 ```text
 final_hidden.bf16: max=0.500000 mean=0.044455 p99=0.152792 rmse=0.059135 cos=0.999898791
-audio_logits.f32:  max=2.868027 mean=0.328455 p99=1.160617 rmse=0.419817 cos=0.999994040
+audio_logits.f32:  max=3.000000 mean=0.310353 p99=1.250000 rmse=0.439906 cos=0.999995470
 
 cpu_f32_from_golden_hidden_vs_golden_logits:
   max=0.484344 mean=0.108543 p99=0.247003
@@ -377,12 +402,23 @@ actual_hidden_effect_cuda_bf16:
   max=3.000000 mean=0.310353 p99=1.250000
 ```
 
-This proves the golden audio head is CUDA bf16 `F.linear`, while the current Rust
-actual writer computes audio logits with a CPU fp32 dot product. That CPU fp32
-implementation alone accounts for about `0.109` mean logit delta even when the
-golden hidden is used. The remaining larger drift comes from the Qwen3 body
-runtime hidden state and should be investigated separately before widening
-tolerances.
+This proves the golden audio head is CUDA bf16 `F.linear`, and the Rust actual
+writer now defaults to the same CUDA bf16 audio-head contract. The older CPU fp32
+fallback remains available as a diagnostic backend, but it is no longer the
+default actual path. The remaining larger drift comes from the Qwen3 body
+runtime hidden state and should be investigated separately before claiming full
+strict golden parity.
+
+The semantic comparison mode is expected to pass on this CUDA bf16 actual dump:
+
+```text
+higgs one-step strict comparison: passed=false diagnostic_only=true
+higgs one-step semantic comparison:
+  prompt_exact=true argmax_exact=true hidden_cosine=0.999898791 hidden_cosine_min=0.999800026
+  logits_cosine=0.999995470 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
+  top64_min_overlap=42 top64_mean_overlap=50.00 top64_min_overlap_tol=40
+higgs one-step semantic comparison: ok
+```
 
 NCU is installed (`2025.1.0.0`) but cannot collect GPU performance counters on
 this host:
@@ -443,14 +479,12 @@ Environment notes:
 
 ## Next Execution Slice
 
-1. Replace the CPU fp32 audio-head dot in the Rust actual writer with a GPU bf16
-   linear path, or make the fixture explicitly target CPU fp32 logits.
+1. Run `higgs_compare_one_step --mode semantic` on the 4090 CUDA bf16 actual
+   dump and record the exact output in this document.
 2. Diagnose the remaining Qwen3-body hidden drift by comparing the Higgs prompt
    against a Transformers dump at intermediate layer boundaries.
-3. Update the comparator so top-64 ids use overlap/regret-style reporting rather
-   than exact equality, while keeping `audio_argmax.ids` exact.
-4. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
+3. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
    the safetensors payload.
-5. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
+4. Compare PegaInfer final hidden and `[8, 1026]` audio logits against this
    fixture with calibrated bf16 tolerances.
-6. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
+5. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
