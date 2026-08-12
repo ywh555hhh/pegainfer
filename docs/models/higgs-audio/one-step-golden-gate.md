@@ -60,7 +60,7 @@ Fixture metadata records:
 The current fixture SHA-256 is:
 
 ```text
-a9c23650c0e9a39ee2b314f1dead7c7d2fd8adfe77c312b198b6e2e6b3d91471
+bbaae8018759b7e8f26d2acfb1aefb5bee3e5099d47573bb4ce3c980b6096684
 ```
 
 ## Rust Gate
@@ -236,13 +236,13 @@ isolation only; it does not replace full workspace CI.
 ## 4090 Bring-Up Notes
 
 The 4090-D host at `/data/src/pegainfer` was synchronized to fork commit
-`1462955e` on branch `feat/higgs-audio-one-step-golden`.
+`18137c4` on branch `feat/higgs-audio-one-step-golden`.
 
 Static model/golden validation passed on the 4090 host with the Python reference
 environment:
 
 ```text
-golden_sha256 a9c23650c0e9a39ee2b314f1dead7c7d2fd8adfe77c312b198b6e2e6b3d91471
+golden_sha256 bbaae8018759b7e8f26d2acfb1aefb5bee3e5099d47573bb4ce3c980b6096684
 config_sha256 match=True
 tokenizer_json_sha256 match=True
 model_index_sha256 match=True
@@ -260,7 +260,7 @@ The Rust isolated Higgs gate and the real checkpoint header gate passed on the
 4090 host:
 
 ```text
-isolated Higgs tests: 14 passed
+isolated Higgs tests: 20 passed
 higgs_compare_one_step self-comparison: ok
 higgs_artifact_check: ok
 checkpoint headers: files=1 tensors=399 bf16=399
@@ -337,8 +337,8 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --bin higgs_dump_one_step_actual -- \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
   --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
-  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
-  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16.safetensors
+  --golden /data/results/pegainfer/higgs-audio/golden/higgs-one-step-golden-18137c4.safetensors \
+  --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-18137c4.safetensors
 ```
 
 The dump is schema-valid and uses the committed golden prompt tensors:
@@ -357,10 +357,10 @@ Strict actual-vs-golden comparison does **not** pass yet:
 prompt.input_ids_padded          pass=true
 prompt.attention_mask            pass=true
 prompt.lengths                   pass=true
-final_hidden.bf16                pass=false max_abs=0.500000 mean_abs=0.044455 p99_abs=0.156250
-audio_logits.f32                 pass=false max_abs=3.000000 mean_abs=0.310353 p99_abs=1.250000
-audio_top64.ids                  pass=false exact_mismatch=485
-audio_top64.logprobs.f32         pass=false mean_abs=2.077849 p99_abs=4.000000
+final_hidden.bf16                pass=false max_abs=0.500000 mean_abs=0.007480 p99_abs=0.062500
+audio_logits.f32                 pass=false max_abs=1.000000 mean_abs=0.112908 p99_abs=0.500000
+audio_top64.ids                  pass=false exact_mismatch=426
+audio_top64.logprobs.f32         pass=false mean_abs=0.089786 p99_abs=0.500000
 audio_argmax.ids                 pass=true
 ```
 
@@ -369,11 +369,11 @@ The useful interpretation is narrower than "pass" but still strong:
 - Prompt tensors are exact, so the runtime is replaying the intended Higgs
   one-step prompt.
 - `final_hidden.bf16` has high directional agreement with the Transformers
-  golden (`cos=0.999898791`), but the absolute drift is larger than the current
+  golden (`cos=0.999990642`), but the absolute drift is larger than the current
   hidden tolerance.
 - All 8 audio argmax ids match. The top-1 audio code for every codebook is
   stable even though top-64 ordering is tie/noise sensitive.
-- Top-64 overlap by codebook is `[58, 50, 42, 42, 50, 54, 49, 55]`; exact
+- Top-64 overlap has minimum `49` and mean `55.75`; exact
   top-64 id equality is too brittle for the current bf16 runtime path.
 
 A new diagnostic script captures these checks and the audio-head dtype
@@ -382,41 +382,35 @@ attribution:
 ```bash
 tools/accuracy/analyze_higgs_one_step_actual.py \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
-  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16.safetensors
+  --golden /data/results/pegainfer/higgs-audio/golden/higgs-one-step-golden-18137c4.safetensors \
+  --actual /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-18137c4.safetensors
 ```
 
-On the RTX 4090 D run, this separates the logits drift into two effects:
+The corrected RTX 4090 D run should be read as a semantic-pass, strict-fail
+boundary:
 
 ```text
-final_hidden.bf16: max=0.500000 mean=0.044455 p99=0.152792 rmse=0.059135 cos=0.999898791
-audio_logits.f32:  max=3.000000 mean=0.310353 p99=1.250000 rmse=0.439906 cos=0.999995470
-
-cpu_f32_from_golden_hidden_vs_golden_logits:
-  max=0.484344 mean=0.108543 p99=0.247003
-cuda_bf16_from_golden_hidden_vs_golden_logits:
-  max=0.000000 mean=0.000000 p99=0.000000
-cuda_bf16_from_actual_hidden_vs_golden_logits:
-  max=3.000000 mean=0.310353 p99=1.250000
-actual_hidden_effect_cuda_bf16:
-  max=3.000000 mean=0.310353 p99=1.250000
+final_hidden.bf16: max=0.500000 mean=0.007480 p99=0.062500 rmse=0.020339 cosine=0.999990642
+audio_logits.f32:  max=1.000000 mean=0.112908 p99=0.500000 rmse=0.224297 cosine=0.999997616
+audio_argmax.ids:  exact=true for all 8 codebooks
+top64_overlap:     min=49 mean=55.75
 ```
 
 This proves the golden audio head is CUDA bf16 `F.linear`, and the Rust actual
 writer now defaults to the same CUDA bf16 audio-head contract. The older CPU fp32
 fallback remains available as a diagnostic backend, but it is no longer the
-default actual path. The remaining larger drift comes from the Qwen3 body
-runtime hidden state and should be investigated separately before claiming full
-strict golden parity.
+default actual path. The remaining strict drift is accumulated bf16/runtime
+numerical drift across the Qwen3 body, not a prompt, embedding, or RoPE reference
+bug.
 
 The semantic comparison mode is expected to pass on this CUDA bf16 actual dump:
 
 ```text
 higgs one-step strict comparison: passed=false diagnostic_only=true
 higgs one-step semantic comparison:
-  prompt_exact=true argmax_exact=true hidden_cosine=0.999898851 hidden_cosine_min=0.999800026
-  logits_cosine=0.999990344 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
-  top64_min_overlap=42 top64_mean_overlap=50.00 top64_min_overlap_tol=40
+  prompt_exact=true argmax_exact=true hidden_cosine=0.999990821 hidden_cosine_min=0.999800026
+  logits_cosine=0.999997616 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
+  top64_min_overlap=49 top64_mean_overlap=55.75 top64_min_overlap_tol=40
 higgs one-step semantic comparison: ok
 ```
 
@@ -434,7 +428,7 @@ PEGAINFER_CUDA_SM=89 PEGAINFER_NVCC_JOBS=8 \
 cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --bin higgs_dump_prefill_layer_hidden -- \
   --qwen3-body-dir /data/results/pegainfer/higgs-audio/qwen3-body-view \
-  --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors \
+  --golden /data/results/pegainfer/higgs-audio/golden/higgs-one-step-golden-18137c4.safetensors \
   --out /data/results/pegainfer/higgs-audio/layer-drift/higgs-layer-hidden-actual.safetensors
 
 /data/venvs/ai-infra/bin/python tools/accuracy/compare_higgs_layer_hidden.py \
@@ -447,23 +441,41 @@ The 4090 run produced this key attribution:
 ```text
 prompt_exact=True
 embedding.last_hidden.bf16   max_abs=0.000000 mean_abs=0.000000 p99_abs=0.000000 rmse=0.000000 cosine=1.000000358
-layer.00.last_hidden.bf16    max_abs=1.000000 mean_abs=0.051948 p99_abs=0.250000 rmse=0.074880 cosine=0.999494791
-layer.09.last_hidden.bf16    max_abs=26.000000 mean_abs=0.940940 p99_abs=3.006405 rmse=1.334986 cosine=0.992176890
-layer.35.last_hidden.bf16    max_abs=128.000000 mean_abs=7.269177 p99_abs=24.000000 rmse=9.608499 cosine=0.999773741
-final_hidden.bf16            max_abs=0.500000 mean_abs=0.044455 p99_abs=0.152792 rmse=0.059135 cosine=0.999898791
+layer.00.last_hidden.bf16    max_abs=0.250000 mean_abs=0.002617 p99_abs=0.031250 rmse=0.007614 cosine=0.999993920
+layer.01.last_hidden.bf16    max_abs=1.000000 mean_abs=0.004883 p99_abs=0.031250 rmse=0.021483 cosine=0.999992847
+layer.14.last_hidden.bf16    max_abs=4.000000 mean_abs=0.028061 p99_abs=0.125000 rmse=0.095240 cosine=0.999987006
+layer.35.last_hidden.bf16    max_abs=32.000000 mean_abs=1.028503 p99_abs=4.000000 rmse=1.772655 cosine=0.999993205
+final_hidden.bf16            max_abs=0.500000 mean_abs=0.007480 p99_abs=0.062500 rmse=0.020339 cosine=0.999990642
 summary:
-  first_mean_abs_gt_0.003000=layer.00.last_hidden.bf16
-  first_cosine_lt_0.999800000=layer.00.last_hidden.bf16
-  worst_mean_abs=layer.35.last_hidden.bf16:7.269177
-  worst_cosine=layer.09.last_hidden.bf16:0.992176890
+  first_mean_abs_gt_0.003000=layer.01.last_hidden.bf16
+  first_cosine_lt_0.999800000=none
+  worst_mean_abs=layer.35.last_hidden.bf16:1.028503
+  worst_cosine=layer.14.last_hidden.bf16:0.999987006
 ```
 
 This rules out prompt construction, tokenizer ids, embedding load, and Qwen3 body
-view aliasing as the source of the remaining strict drift. The first measurable
-divergence appears inside layer 0 after an exact embedding boundary. The next
-root-cause slice should instrument layer 0 internals: input RMSNorm, q/k/v
-projection slices, q/k RMSNorm + RoPE, prefill attention output, o projection,
-post-attention RMSNorm, and MLP down projection.
+view aliasing as the source of the remaining strict drift. It also shows that
+the corrected golden reduces layer 0 from a suspicious failure boundary to a
+within-tolerance stage: mean absolute drift stays below `0.003`, and no compared
+layer drops below cosine `0.9998`.
+
+The layer-0 stage dump further rules out the earlier RoPE suspicion:
+
+```text
+layer0.q_norm_rope.bf16      mean_abs=0.001261 cosine=0.999998450
+layer0.k_norm_rope.bf16      mean_abs=0.001323 cosine=0.999999285
+layer0.output_hidden.bf16    mean_abs=0.002617 cosine=0.999993920
+summary:
+  compared=17
+  first_mean_abs_gt_0.003000=none
+  first_cosine_lt_0.999800000=none
+```
+
+The earlier RoPE divergence was a false-positive in the HuggingFace golden
+diagnostic: `Qwen3Model` was created on the meta device and then `to_empty()` was
+used, which left non-persistent rotary buffers uninitialized. The generator now
+rebuilds `Qwen3RotaryEmbedding` on the real device after `to_empty()`, before
+loading the Higgs body weights.
 
 NCU is installed (`2025.1.0.0`) but cannot collect GPU performance counters on
 this host:
@@ -498,6 +510,24 @@ Environment notes:
   workspace dependency isolation/cache issue, not a Higgs crate correctness
   failure.
 
+## Contribution Summary
+
+This branch now has a concrete Higgs-Audio bring-up milestone suitable for an
+upstream issue update:
+
+- Built a one-step Higgs-Audio golden pipeline with prompt tensors, final hidden,
+  fused 8-codebook audio logits, top-64 ids/logprobs, and argmax ids.
+- Materialized a Qwen3-compatible view of the Higgs body weights and validated
+  it on RTX 4090 D through the existing PegaInfer Qwen3 runtime path.
+- Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
+  loader; the suspected CUDA RoPE failure was a false-positive.
+- Added strict and semantic comparison modes. Corrected 4090 run passes semantic
+  parity with exact 8-codebook argmax, zero argmax regret, hidden cosine
+  `0.999990821`, and logits cosine `0.999997616`.
+- Added layer-hidden and layer-0 stage diagnostics. Layer 0 is now within the
+  mean drift threshold, while strict parity remains open because bf16/runtime
+  drift accumulates across 36 Qwen3 layers.
+
 ## Technical Debt
 
 - The branch commits a derived fixture from a research/non-commercial model. This
@@ -524,13 +554,15 @@ Environment notes:
 
 ## Next Execution Slice
 
-1. Instrument layer 0 internals now that embedding parity is exact and the
-   first drift appears after the first transformer block.
-2. Compare layer-0 input RMSNorm, q/k/v projection slices, q/k RMSNorm + RoPE,
-   prefill attention output, o projection, post-attention RMSNorm, and MLP down
-   projection against HF hooks.
-3. Fix the first divergent primitive before widening the strict one-step
-   tolerance.
-4. Add a Higgs-owned runtime path that reuses the Qwen3 body without duplicating
-   the safetensors payload.
-5. Only after that, add delay-pattern, sampling, KV decode, and codec gates.
+1. Decide whether upstream wants semantic parity as the first Higgs-Audio gate,
+   or whether strict hidden/logit/top-64 parity is required before review.
+2. If strict parity is required, add deeper stage probes at later layers
+   (`14`, `32`, `35`) where accumulated drift is largest, instead of continuing
+   to focus on layer 0.
+3. Add a Higgs-owned runtime path that reuses the Qwen3 body tensors without
+   duplicating the safetensors payload into a separate body-view file.
+4. Broaden the fixture beyond one prompt: longer text, multiple prompt lengths,
+   delay-pattern coverage, and at least one decode/KV-cache continuation.
+5. After correctness gates are accepted, profile the Higgs-owned runtime path
+   with NSYS; use NCU only on hosts where NVIDIA performance counters are
+   unlocked.

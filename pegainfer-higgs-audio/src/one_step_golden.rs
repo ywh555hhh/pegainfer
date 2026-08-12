@@ -203,7 +203,7 @@ mod tests {
         let contract = load_and_validate(GOLDEN).expect("validate committed Higgs golden");
         assert_eq!(
             contract.sha256,
-            "a9c23650c0e9a39ee2b314f1dead7c7d2fd8adfe77c312b198b6e2e6b3d91471"
+            "bbaae8018759b7e8f26d2acfb1aefb5bee3e5099d47573bb4ce3c980b6096684"
         );
         assert_eq!(contract.bytes, 46_064);
     }
