@@ -421,6 +421,73 @@ impl Qwen3Model {
         )
     }
 
+    /// Run a single prompt prefill and return per-layer raw hidden snapshots for
+    /// the last prompt token, plus the final RMSNorm'ed hidden consumed by heads.
+    ///
+    /// This is a diagnostic parity hook for model bring-up. The layer snapshots
+    /// intentionally match HuggingFace `output_hidden_states=True`: after each
+    /// transformer block and before the final model norm.
+    pub(crate) fn prefill_last_hidden_layer_snapshots(
+        &self,
+        prompt: &[u32],
+        kv_view: &KvView,
+        kv_buffer: &CudaSlice<bf16>,
+        layout: &KvLayout,
+    ) -> Result<(Vec<DeviceVec>, DeviceVec)> {
+        anyhow::ensure!(!prompt.is_empty(), "prompt must not be empty");
+
+        let mut hidden = self.get_embeddings_batch(prompt)?;
+        let start_position = kv_view.seq_len() - prompt.len();
+        let plan = PrefillPagedPlan::from_raw_batch_with_cta_tile_q(
+            &self.ctx,
+            &[kv_view.page_indices().to_vec()],
+            &[kv_view.last_page_len()],
+            &[start_position],
+            &[prompt.len()],
+            self.local_num_attention_heads(),
+            self.local_num_key_value_heads(),
+            self.config.head_dim,
+            PREFILL_ATTENTION_CTA_TILE_Q,
+        )?;
+
+        let total_tokens = hidden.seq_len;
+        let inter_dim = self.local_intermediate_size();
+        let q_dim = self.local_q_dim();
+        let kv_dim = self.local_kv_dim();
+        let last_token_idx = prompt.len() - 1;
+
+        let mut bufs = PrefillBuffers::new(
+            &self.ctx,
+            self.config.hidden_size,
+            q_dim,
+            kv_dim,
+            inter_dim,
+            total_tokens,
+        )?;
+        let mut layer_snapshots = Vec::with_capacity(self.layers.len());
+        for (layer_idx, layer) in self.layers.iter().enumerate() {
+            self.forward_layer_batch_paged(
+                layer_idx,
+                layer,
+                &mut hidden,
+                kv_buffer,
+                layout,
+                &plan,
+                &mut bufs,
+            )?;
+            layer_snapshots.push(ops::extract_vec(&self.ctx, &hidden, last_token_idx)?);
+        }
+
+        let last_hidden = ops::extract_vec(&self.ctx, &hidden, last_token_idx)?;
+        let final_normed = ops::rms_norm(
+            &self.ctx,
+            &last_hidden,
+            &self.norm,
+            self.config.rms_norm_eps,
+        )?;
+        Ok((layer_snapshots, final_normed))
+    }
+
     fn process_all_layers_batch_multi(
         &self,
         mut hidden: HiddenStates,

@@ -7,6 +7,7 @@
 
 pub mod compare;
 pub mod config;
+pub mod layer_dump;
 pub mod load_plan;
 pub mod materialize_qwen3;
 pub mod one_step_actual;

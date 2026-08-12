@@ -229,6 +229,14 @@ fn execute_step_on_lane(
                 Ok(WorkerStepOutcome::Ack)
             }
         }
+        StepCommand::PrefillLayerHidden { prompt, kv_view } => {
+            let hidden = lane.execute_prefill_layer_hidden(prompt, kv_view)?;
+            if collect_result {
+                Ok(WorkerStepOutcome::PrefillLayerHidden(hidden))
+            } else {
+                Ok(WorkerStepOutcome::Ack)
+            }
+        }
         StepCommand::Unified {
             prefill_requests,
             prefill_kv_views,
@@ -407,6 +415,12 @@ pub struct UnifiedResult {
 #[derive(Clone, Debug)]
 pub struct PrefillHiddenResult {
     pub hidden_bf16: Vec<half::bf16>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PrefillLayerHiddenResult {
+    pub layer_hidden_bf16: Vec<Vec<half::bf16>>,
+    pub final_normed_bf16: Vec<half::bf16>,
 }
 
 pub(crate) trait ModelExecutor: Send {
@@ -671,6 +685,35 @@ impl Qwen3Executor {
             WorkerStepOutcome::PrefillHidden(result) => Ok(result),
             other => Err(anyhow::anyhow!(
                 "prefill hidden returned unexpected: {}",
+                other.kind()
+            )),
+        }
+    }
+
+    pub fn prefill_layer_hidden_bf16(
+        &mut self,
+        prompt_tokens: Vec<u32>,
+    ) -> Result<PrefillLayerHiddenResult> {
+        anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
+        let mut rkv = self.kv_mgr.new_request(
+            prompt_tokens.clone(),
+            1,
+            self.active_lora_adapter.as_deref(),
+        );
+        rkv.schedule_prefill(prompt_tokens.len(), &self.kv_mgr)
+            .map_err(|e| {
+                anyhow::anyhow!("schedule_prefill failed for diagnostic layer dump: {e}")
+            })?;
+        let kv_view = rkv.prefill_view(prompt_tokens.len());
+        let step = StepCommand::PrefillLayerHidden {
+            prompt: prompt_tokens,
+            kv_view,
+        };
+        let outcome = self.run_step(&step)?;
+        match outcome {
+            WorkerStepOutcome::PrefillLayerHidden(result) => Ok(result),
+            other => Err(anyhow::anyhow!(
+                "prefill layer hidden returned unexpected: {}",
                 other.kind()
             )),
         }
@@ -1251,6 +1294,40 @@ impl LocalQwen3Lane {
         Ok(host)
     }
 
+    fn execute_prefill_layer_hidden(
+        &mut self,
+        prompt: &[u32],
+        kv_view: &KvView,
+    ) -> Result<PrefillLayerHiddenResult> {
+        let (layer_hidden, final_normed) = self.model.prefill_last_hidden_layer_snapshots(
+            prompt,
+            kv_view,
+            self.kv_buffer.buffer(),
+            &self.layout,
+        )?;
+        let mut layer_hidden_bf16 = Vec::with_capacity(layer_hidden.len());
+        for hidden in layer_hidden {
+            layer_hidden_bf16.push(
+                self.model
+                    .device_ctx()
+                    .stream
+                    .clone_dtoh(&hidden.data)
+                    .map_err(|e| anyhow::anyhow!("D2H layer hidden copy failed: {e}"))?,
+            );
+        }
+        let final_normed_bf16 = self
+            .model
+            .device_ctx()
+            .stream
+            .clone_dtoh(&final_normed.data)
+            .map_err(|e| anyhow::anyhow!("D2H final normed hidden copy failed: {e}"))?;
+        self.model.device_ctx().sync()?;
+        Ok(PrefillLayerHiddenResult {
+            layer_hidden_bf16,
+            final_normed_bf16,
+        })
+    }
+
     fn execute_decode(&mut self, token_ids: &[u32], kv_views: &[KvView]) -> Result<()> {
         self.model.batch_decode(
             token_ids,
@@ -1320,6 +1397,10 @@ enum StepCommand {
         prompt: Vec<u32>,
         kv_view: KvView,
     },
+    PrefillLayerHidden {
+        prompt: Vec<u32>,
+        kv_view: KvView,
+    },
 }
 
 impl StepCommand {
@@ -1329,6 +1410,7 @@ impl StepCommand {
             Self::Decode { .. } => "decode",
             Self::Unified { .. } => "unified",
             Self::PrefillLastHidden { .. } => "prefill_hidden",
+            Self::PrefillLayerHidden { .. } => "prefill_layer_hidden",
         }
     }
 }
@@ -1362,6 +1444,7 @@ enum WorkerStepOutcome {
     Decode(DecodeResult),
     Unified(UnifiedResult),
     PrefillHidden(PrefillHiddenResult),
+    PrefillLayerHidden(PrefillLayerHiddenResult),
 }
 
 impl WorkerStepOutcome {
@@ -1372,6 +1455,7 @@ impl WorkerStepOutcome {
             Self::Decode(_) => "decode",
             Self::Unified(_) => "unified",
             Self::PrefillHidden(_) => "prefill_hidden",
+            Self::PrefillLayerHidden(_) => "prefill_layer_hidden",
         }
     }
 }

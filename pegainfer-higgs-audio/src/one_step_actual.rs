@@ -58,7 +58,7 @@ pub struct OneStepActualSummary {
 }
 
 #[derive(Clone)]
-struct OwnedTensor {
+pub(crate) struct OwnedTensor {
     dtype: Dtype,
     shape: Vec<usize>,
     data: Vec<u8>,
@@ -345,7 +345,7 @@ fn audio_topk_and_argmax(logits: &[f32]) -> (Vec<i64>, Vec<f32>, Vec<i64>) {
     (top_ids, top_logprobs, argmax)
 }
 
-fn owned_i64(shape: &[usize], values: &[i64]) -> OwnedTensor {
+pub(crate) fn owned_i64(shape: &[usize], values: &[i64]) -> OwnedTensor {
     OwnedTensor {
         dtype: Dtype::I64,
         shape: shape.to_vec(),
@@ -367,7 +367,7 @@ fn owned_f32(shape: &[usize], values: &[f32]) -> OwnedTensor {
     }
 }
 
-fn owned_bf16(shape: &[usize], values: &[bf16]) -> OwnedTensor {
+pub(crate) fn owned_bf16(shape: &[usize], values: &[bf16]) -> OwnedTensor {
     OwnedTensor {
         dtype: Dtype::BF16,
         shape: shape.to_vec(),

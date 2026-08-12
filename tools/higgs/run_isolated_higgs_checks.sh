@@ -17,9 +17,11 @@ text = re.sub(r'^pegainfer-core = .*\n', '', text, flags=re.MULTILINE)
 text = re.sub(r'^pegainfer-qwen3-4b = .*\n', '', text, flags=re.MULTILINE)
 text = re.sub(r'runtime-qwen3 = .*\n', 'runtime-qwen3 = []\n', text)
 text = re.sub(r'\n\[\[bin\]\]\nname = "higgs_dump_one_step_actual"\npath = "src/bin/higgs_dump_one_step_actual.rs"\nrequired-features = \["runtime-qwen3"\]\n', '\n', text)
+text = re.sub(r'\n\[\[bin\]\]\nname = "higgs_dump_prefill_layer_hidden"\npath = "src/bin/higgs_dump_prefill_layer_hidden.rs"\nrequired-features = \["runtime-qwen3"\]\n', '\n', text)
 path.write_text(text)
 PY
 rm -f "$tmp_root/pegainfer-higgs-audio/src/bin/higgs_dump_one_step_actual.rs"
+rm -f "$tmp_root/pegainfer-higgs-audio/src/bin/higgs_dump_prefill_layer_hidden.rs"
 mkdir -p "$tmp_root/test_data"
 cp "$repo_root/test_data/higgs-one-step-audio-logits.safetensors" "$tmp_root/test_data/"
 
