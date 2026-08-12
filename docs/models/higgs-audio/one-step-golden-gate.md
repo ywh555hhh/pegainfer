@@ -99,6 +99,31 @@ depend on them:
 - The expected KV footprint is 144 KiB per position, or 1152 MiB for 8192
   positions in bf16.
 
+## Checkpoint Header Gate
+
+The fourth slice strengthens `higgs_artifact_check` with a header-only
+safetensors validation pass. It reads only the safetensors length prefix and JSON
+header, not the multi-GB tensor payload, so it can run as a fast loader
+preflight.
+
+The gate validates the required runtime surface:
+
+- text embedding: `[151936, 2560]` BF16
+- fused modality embedding/head: `[8208, 2560]` BF16
+- body norm: `[2560]` BF16
+- per-layer attention projections:
+  - `q_proj`: `[4096, 2560]` BF16
+  - `k_proj` / `v_proj`: `[1024, 2560]` BF16
+  - `o_proj`: `[2560, 4096]` BF16
+  - `q_norm` / `k_norm`: `[128]` BF16
+- per-layer MLP projections:
+  - `gate_proj` / `up_proj`: `[9728, 2560]` BF16
+  - `down_proj`: `[2560, 9728]` BF16
+
+This proves the checkpoint is not merely named correctly in
+`model.safetensors.index.json`; the actual safetensors shard header must agree
+with the Higgs/Qwen3 loader contract.
+
 ## Comparison Gate
 
 The third slice defines the actual runtime parity contract:

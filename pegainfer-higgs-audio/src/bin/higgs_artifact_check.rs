@@ -4,7 +4,9 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use pegainfer_higgs_audio::config::{EXPECTED_MODEL_CARD_CONTEXT, HiggsConfig};
 use pegainfer_higgs_audio::one_step_golden::{self, REQUIRED_TENSORS};
-use pegainfer_higgs_audio::weights::{HiggsWeightManifest, fused_modality_shape};
+use pegainfer_higgs_audio::weights::{
+    HiggsWeightManifest, fused_modality_shape, validate_checkpoint_headers,
+};
 use sha2::{Digest, Sha256};
 
 #[derive(Parser)]
@@ -22,6 +24,7 @@ fn main() -> Result<()> {
     let config = HiggsConfig::from_model_dir(&args.model_dir)?;
     let manifest = HiggsWeightManifest::from_model_dir(&args.model_dir)?;
     let summary = manifest.validate_for_config(&config)?;
+    let header_summary = validate_checkpoint_headers(&args.model_dir, &config, &manifest)?;
     let golden = one_step_golden::load_and_validate(&args.golden)?;
 
     check_metadata_hash(
@@ -68,6 +71,12 @@ fn main() -> Result<()> {
         summary.body_tensors,
         summary.decoder_only_tensors,
         fused_modality_shape()
+    );
+    println!(
+        "  checkpoint headers: files={} tensors={} bf16={}",
+        header_summary.files_checked,
+        header_summary.tensors_checked,
+        header_summary.bf16_tensors_checked
     );
 
     Ok(())
