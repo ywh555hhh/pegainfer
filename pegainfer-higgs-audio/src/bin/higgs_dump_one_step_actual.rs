@@ -5,6 +5,7 @@ use clap::{Parser, ValueEnum};
 use pegainfer_higgs_audio::runtime_bridge::{
     AudioHeadBackend as RuntimeAudioHeadBackend, HiggsOneStepRuntime, HiggsRuntimeSource,
 };
+use pegainfer_higgs_audio::runtime_source::{Qwen3RuntimeSourcePath, select_qwen3_runtime_source};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum AudioHeadBackend {
@@ -41,14 +42,21 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let auto_qwen3_config_dir = default_qwen3_config_dir(&args.out);
-    let source = match (&args.qwen3_body_dir, &args.qwen3_config_dir) {
-        (Some(qwen3_body_dir), None) => HiggsRuntimeSource::Qwen3BodyView { qwen3_body_dir },
-        (None, Some(qwen3_config_dir)) => HiggsRuntimeSource::Qwen3ConfigAlias { qwen3_config_dir },
-        (None, None) => HiggsRuntimeSource::AutoConfigAlias {
-            qwen3_config_dir: &auto_qwen3_config_dir,
-        },
-        _ => unreachable!("clap prevents multiple Qwen3 runtime sources"),
+    let source_path = select_qwen3_runtime_source(
+        args.qwen3_body_dir.as_deref(),
+        args.qwen3_config_dir.as_deref(),
+        &args.out,
+    )?;
+    let source = match &source_path {
+        Qwen3RuntimeSourcePath::BodyView(qwen3_body_dir) => {
+            HiggsRuntimeSource::Qwen3BodyView { qwen3_body_dir }
+        }
+        Qwen3RuntimeSourcePath::ConfigAlias(qwen3_config_dir) => {
+            HiggsRuntimeSource::Qwen3ConfigAlias { qwen3_config_dir }
+        }
+        Qwen3RuntimeSourcePath::AutoConfigAlias(qwen3_config_dir) => {
+            HiggsRuntimeSource::AutoConfigAlias { qwen3_config_dir }
+        }
     };
     let mut runtime = HiggsOneStepRuntime::from_model_dir(
         &args.model_dir,
@@ -65,12 +73,6 @@ fn main() -> Result<()> {
     println!("  hidden_values: {}", summary.hidden_values);
     println!("  audio_logits: {}", summary.audio_logits);
     Ok(())
-}
-
-fn default_qwen3_config_dir(out: &PathBuf) -> PathBuf {
-    out.parent()
-        .map(|parent| parent.join("higgs-qwen3-config-view"))
-        .unwrap_or_else(|| PathBuf::from("higgs-qwen3-config-view"))
 }
 
 impl From<AudioHeadBackend> for RuntimeAudioHeadBackend {

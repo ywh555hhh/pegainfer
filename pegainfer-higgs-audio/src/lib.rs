@@ -14,4 +14,5 @@ pub mod one_step_actual;
 pub mod one_step_golden;
 #[cfg(feature = "runtime-qwen3")]
 pub mod runtime_bridge;
+pub mod runtime_source;
 pub mod weights;
