@@ -422,7 +422,7 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label a514447
+  --label d2dcb92
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
@@ -487,10 +487,28 @@ The summary checker also passed on the 4090-D run:
 higgs gate summary: ok commit=a514447d label=a514447 sm=89
 ```
 
-The session smoke retains the prompt KV under request id `1`, emits the same
-one-step audio prediction, and drops the request explicitly. This proves the
-current Higgs bridge can own a request id and prompt-only KV lifecycle without
-registering an invalid generated text token.
+After the Higgs-owned `HiggsPromptSession` handle replaced Qwen3 `RequestId` as
+the primary prompt-session API, the full CUDA gate was rerun on the same 4090-D
+host at `d2dcb92`:
+
+```text
+status=ok
+commit=d2dcb922
+label=d2dcb92
+actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-d2dcb92.safetensors
+session_actual=/data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-d2dcb92.safetensors
+semantic_comparison=ok
+session_semantic_comparison=ok
+duplicate_request_id_guard=ok
+artifacts_nonempty=ok
+higgs gate summary: ok commit=d2dcb922 label=d2dcb92 sm=89
+```
+
+The session smoke retains the prompt KV under Higgs session id `1`, emits the
+same one-step audio prediction, and drops the session explicitly. Internally this
+still maps to the backing Qwen3 request id, but the primary runtime surface is now
+a Higgs-owned prompt-session lifecycle and does not register an invalid generated
+text token.
 
 The script was validated on the 4090-D host at `7d5ab1d` after the prompt-id
 prefill bridge split and produced:
