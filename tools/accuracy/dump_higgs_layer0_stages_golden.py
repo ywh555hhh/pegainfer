@@ -127,12 +127,10 @@ def main() -> None:
         raise RuntimeError("missing q/k norm snapshots")
     position_ids = torch.arange(max_len, device=args.device).unsqueeze(0)
     cos, sin = backbone.rotary_emb(input_ids, position_ids)
-    q_rope, k_rope = apply_rotary_pos_emb(
-        q_norm_all.transpose(1, 2),
-        k_norm_all.transpose(1, 2),
-        cos,
-        sin,
-    )
+    # HF Qwen3Attention applies q_norm/k_norm after reshaping projections to
+    # [batch, heads, seq, head_dim], so the hook outputs are already in the
+    # layout expected by apply_rotary_pos_emb.
+    q_rope, k_rope = apply_rotary_pos_emb(q_norm_all, k_norm_all, cos, sin)
     stages["layer0.q_norm_rope.bf16"] = last_token(
         q_rope.transpose(1, 2).reshape(len(prompt_ids), max_len, -1),
         row_idx,
