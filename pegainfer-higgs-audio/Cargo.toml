@@ -27,6 +27,11 @@ path = "src/bin/higgs_dump_one_step_actual.rs"
 required-features = ["runtime-qwen3"]
 
 [[bin]]
+name = "higgs_prefill_prompt_session_smoke"
+path = "src/bin/higgs_prefill_prompt_session_smoke.rs"
+required-features = ["runtime-qwen3"]
+
+[[bin]]
 name = "higgs_dump_prefill_layer_hidden"
 path = "src/bin/higgs_dump_prefill_layer_hidden.rs"
 required-features = ["runtime-qwen3"]

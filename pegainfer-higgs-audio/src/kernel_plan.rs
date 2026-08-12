@@ -45,6 +45,12 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
                     notes: "runs the Higgs text/body checkpoint through the existing Qwen3 prefill path via tensor-name aliases",
                 },
                 KernelOp {
+                    id: "qwen3_prompt_session_prefill",
+                    rust: "runtime_bridge::HiggsOneStepRuntime::prefill_prompt_session_from_prompt_ids -> Qwen3Executor::prefill_last_hidden_bf16_retained_prompt",
+                    backend: "Qwen3 runtime: CUDA + cuBLAS + FlashInfer + paged KV",
+                    notes: "retains prompt KV under a request id without registering a generated text token",
+                },
+                KernelOp {
                     id: "fused_audio_head",
                     rust: "one_step_actual::compute_one_step_audio_prediction_gpu_bf16 -> ops::linear",
                     backend: "CUDA bf16 linear",
@@ -107,6 +113,9 @@ mod tests {
         assert!(ops.iter().any(|op| {
             op.id == "qwen3_body_prefill"
                 && op.backend == "Qwen3 runtime: CUDA + cuBLAS + FlashInfer"
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "qwen3_prompt_session_prefill" && op.notes.contains("retains prompt KV")
         }));
         assert!(
             ops.iter()

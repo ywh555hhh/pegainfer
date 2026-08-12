@@ -192,6 +192,21 @@ impl RequestKv {
             .map_err(|e| anyhow::anyhow!("apply_prefill: {e}"))
     }
 
+    /// Apply a prefill chunk without registering a first generated token.
+    ///
+    /// This is valid for intermediate prefill chunks and for prompt-only
+    /// requests with `max_output_tokens == 0`. Regular text-generation
+    /// requests should use `apply_prefill(token, manager)` on the final prefill
+    /// chunk so the first sampled token becomes the pending decode token.
+    pub fn apply_prefill_without_generated(
+        &mut self,
+        manager: &KvCacheManager,
+    ) -> anyhow::Result<()> {
+        self.seq
+            .apply_prefill(None, &manager.block_manager)
+            .map_err(|e| anyhow::anyhow!("apply_prefill_without_generated: {e}"))
+    }
+
     pub fn apply_decode(
         &mut self,
         token: u32,

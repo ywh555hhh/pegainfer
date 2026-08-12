@@ -427,6 +427,12 @@ pub struct PrefillHiddenResult {
 }
 
 #[derive(Clone, Debug)]
+pub struct RetainedPrefillHiddenResult {
+    pub request_id: RequestId,
+    pub hidden_bf16: Vec<half::bf16>,
+}
+
+#[derive(Clone, Debug)]
 pub struct PrefillLayerHiddenResult {
     pub embedding_hidden_bf16: Vec<half::bf16>,
     pub layer_hidden_bf16: Vec<Vec<half::bf16>>,
@@ -723,6 +729,44 @@ impl Qwen3Executor {
                 other.kind()
             )),
         }
+    }
+
+    pub fn prefill_last_hidden_bf16_retained_prompt(
+        &mut self,
+        request_id: RequestId,
+        prompt_tokens: Vec<u32>,
+    ) -> Result<RetainedPrefillHiddenResult> {
+        anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
+        let mut rkv = self.kv_mgr.new_request(
+            prompt_tokens.clone(),
+            0,
+            self.active_lora_adapter.as_deref(),
+        );
+        rkv.schedule_prefill(prompt_tokens.len(), &self.kv_mgr)
+            .map_err(|e| {
+                anyhow::anyhow!("schedule_prefill failed for retained prompt hidden: {e}")
+            })?;
+        let kv_view = rkv.prefill_view(prompt_tokens.len());
+        let step = StepCommand::PrefillLastHidden {
+            prompt: prompt_tokens,
+            kv_view,
+        };
+        let outcome = self.run_step(&step)?;
+        let result = match outcome {
+            WorkerStepOutcome::PrefillHidden(result) => result,
+            other => {
+                return Err(anyhow::anyhow!(
+                    "retained prefill hidden returned unexpected: {}",
+                    other.kind()
+                ));
+            }
+        };
+        rkv.apply_prefill_without_generated(&self.kv_mgr)?;
+        self.request_kvs.insert(request_id, rkv);
+        Ok(RetainedPrefillHiddenResult {
+            request_id,
+            hidden_bf16: result.hidden_bf16,
+        })
     }
 
     pub fn prefill_layer_hidden_bf16(

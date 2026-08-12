@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use half::bf16;
 use pegainfer_core::weight_loader::TensorNameAliases;
-use pegainfer_qwen3_4b::runtime::Qwen3Executor;
+use pegainfer_qwen3_4b::runtime::{Qwen3Executor, RequestId};
 
 use crate::config::HiggsConfig;
 use crate::load_plan::HiggsRuntimeLoadPlan;
@@ -37,6 +37,14 @@ pub struct HiggsOneStepRuntime {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HiggsOneStepPrefill {
+    pub prompt_tokens: usize,
+    pub final_hidden_bf16: Vec<bf16>,
+    pub audio: OneStepAudioPrediction,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HiggsPromptSessionPrefill {
+    pub request_id: RequestId,
     pub prompt_tokens: usize,
     pub final_hidden_bf16: Vec<bf16>,
     pub audio: OneStepAudioPrediction,
@@ -102,6 +110,36 @@ impl HiggsOneStepRuntime {
             final_hidden_bf16: hidden,
             audio,
         })
+    }
+
+    pub fn prefill_prompt_session_from_prompt_ids(
+        &mut self,
+        request_id: RequestId,
+        prompt_ids: &[u32],
+    ) -> Result<HiggsPromptSessionPrefill> {
+        let retained = self
+            .executor
+            .prefill_last_hidden_bf16_retained_prompt(request_id, prompt_ids.to_vec())?;
+        let audio = match self.audio_head_backend {
+            AudioHeadBackend::CudaBf16 => compute_one_step_audio_prediction_gpu_bf16(
+                &retained.hidden_bf16,
+                &self.audio_head,
+                self.device_ordinal,
+            )?,
+            AudioHeadBackend::CpuFp32 => {
+                compute_one_step_audio_prediction(&retained.hidden_bf16, &self.audio_head)?
+            }
+        };
+        Ok(HiggsPromptSessionPrefill {
+            request_id: retained.request_id,
+            prompt_tokens: prompt_ids.len(),
+            final_hidden_bf16: retained.hidden_bf16,
+            audio,
+        })
+    }
+
+    pub fn drop_prompt_session(&mut self, request_id: RequestId) -> Result<()> {
+        self.executor.drop_request(request_id)
     }
 }
 

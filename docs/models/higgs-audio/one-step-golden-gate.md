@@ -171,6 +171,14 @@ dump path loads prompt tensors from the fixture and then calls this runtime API;
 it is no longer the only way to obtain Higgs audio logits from the bridge. This
 is still a one-shot diagnostic prefill path, not a retained KV-cache session.
 
+The next bridge slice adds `prefill_prompt_session_from_prompt_ids(request_id,
+prompt_ids)`. It uses a new Qwen3 `prefill_last_hidden_bf16_retained_prompt`
+entrypoint and commits prompt KV with `max_output_tokens = 0`, so no generated
+text token is registered. This is intentionally narrower than full decode
+continuation: it proves Higgs can own a request id and prompt KV lifecycle, while
+avoiding the incorrect shortcut of feeding Higgs audio-codebook ids into Qwen3's
+text-token decode state.
+
 ## Qwen3 Runtime Bridge
 
 The sixth slice originally added a bridge materializer that rewrites the single
@@ -635,6 +643,8 @@ upstream issue update:
   serving paths can reuse logits/top-k/argmax without going through a dump file.
 - Added a prompt-id runtime bridge entrypoint that returns Higgs prefill hidden
   state plus audio prediction before any golden-file writer is involved.
+- Added a prompt-only retained KV bridge for Higgs sessions, backed by Qwen3's
+  paged KV lifecycle and explicit request-id drop.
 - Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
   loader; the suspected CUDA RoPE failure was a false-positive.
 - Added strict and semantic comparison modes. Corrected 4090 run passes semantic
