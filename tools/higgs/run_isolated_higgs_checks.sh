@@ -32,6 +32,7 @@ cp "$repo_root/test_data/higgs-one-step-audio-logits.safetensors" "$tmp_root/tes
 python3 -m py_compile \
   "$repo_root/tools/higgs/check_higgs_gate_summary.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_imports.py" \
+  "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summary.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py"
 
 summary_tmp="$tmp_root/summary-checks"
@@ -102,6 +103,33 @@ python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py" 
   --expected-sglang-omni-src /src/sglang-omni \
   --expected-sglang-omni-commit abc1234 \
   --expected-golden "$summary_tmp/golden.safetensors" \
+  --check-files
+
+printf '%s\n' \
+  'direct_higgs_imports=ok' \
+  'full_higgs_model_import=ok' \
+  >"$summary_tmp/runtime-readiness.txt"
+printf '%s\n' \
+  'status=ok' \
+  "repo=$repo_root" \
+  'commit=isolated' \
+  'label=isolated' \
+  'python=python3' \
+  'sglang_omni_src=/src/sglang-omni' \
+  'sglang_omni_commit=abc1234' \
+  "readiness_log=$summary_tmp/runtime-readiness.txt" \
+  'sglang_omni_direct_imports=ok' \
+  'sglang_omni_full_model_import=ok' \
+  'runtime_ready=ok' \
+  'artifacts_nonempty=ok' \
+  >"$summary_tmp/runtime-readiness-gate.txt"
+python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summary.py" \
+  "$summary_tmp/runtime-readiness-gate.txt" \
+  --expected-status ok \
+  --expected-label isolated \
+  --expected-python python3 \
+  --expected-sglang-omni-src /src/sglang-omni \
+  --expected-sglang-omni-commit abc1234 \
   --check-files
 
 cat >"$tmp_root/Cargo.toml" <<'TOML'

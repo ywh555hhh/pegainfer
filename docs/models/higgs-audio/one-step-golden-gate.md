@@ -150,6 +150,59 @@ This means the one-step golden can be strict-checked against SGLang-Omni's Higgs
 source modules, but a full SGLang-Omni model/runtime comparison still needs an
 isolated environment with the `sglang` serving dependency installed.
 
+The fail-closed precondition for claiming full SGLang-Omni runtime parity is:
+
+```bash
+tools/higgs/run_higgs_sglang_omni_runtime_readiness_gate.sh \
+  --sglang-omni-src /data/src/sglang-omni \
+  --python /data/venvs/sglang-omni/bin/python \
+  --label <short-sha>
+```
+
+This gate writes:
+
+```text
+<result-root>/actual/sglang-omni-runtime-readiness-<label>.txt
+<result-root>/actual/higgs-sglang-omni-runtime-readiness-gate-<label>.txt
+```
+
+It requires `direct_higgs_imports=ok` and `full_higgs_model_import=ok`. On the
+current `/data/venvs/ai-infra` environment it is expected to fail closed with
+`full_higgs_model_import=missing_sglang`; that failure is the correct evidence
+boundary, not a runtime parity result. Once an isolated SGLang-Omni runtime env
+passes this gate, the next deliverable is a full-model one-step tensor dump and
+comparison against the same fixture.
+
+A minimal isolated import environment was also attempted on the 4090-D host at
+`/data/venvs/sglang-omni-import`. It uses `--system-site-packages` to reuse the
+machine's CUDA 12.8 PyTorch (`torch 2.6.0a0+ecf3bae40a.nv25.1`) and then installs
+only the missing import-layer packages (`sglang==0.5.16`, `sgl-kernel`,
+`transformers==5.12.1`, `huggingface-hub`, `regex>=2025.10.22`,
+`tokenizers==0.23.0rc0`, `orjson`, `pybase64`, and common server utilities). The
+latest gate artifact is:
+
+```text
+/data/results/pegainfer/higgs-audio/actual/higgs-sglang-omni-runtime-readiness-gate-sglang-import-common-deps.txt
+```
+
+That attempt restores direct Higgs source imports, but still fails the full
+runtime model import:
+
+```text
+sglang_omni_direct_imports=ok
+sglang_omni_full_model_import=ImportError:cannot import name '_cuda_beginAllocateCurrentThreadToPool' from 'torch.cuda.memory' (/usr/local/lib/python3.12/dist-packages/torch/cuda/memory.py)
+runtime_ready=fail
+```
+
+Interpretation: this is now a torch/SGLang runtime-stack mismatch, not a Higgs
+tokenizer/head-source issue. The SGLang-Omni `pyproject.toml` pins
+`torch==2.11.0` and CUDA 13-flavored packages (`flash-attn-4`,
+`flashinfer_python[cu13]`, `nvidia-cutlass-dsl[cu13]`, etc.), while the current
+4090-D image exposes CUDA 12.8 and a vendor torch 2.6.0a0 build. Full SGLang
+runtime parity likely needs a separate image or a fully isolated torch 2.11 /
+CUDA 13-compatible environment, not incremental installs into the current
+system-site venv.
+
 ## Generated Artifact
 
 The fork branch carries a small derived fixture:
