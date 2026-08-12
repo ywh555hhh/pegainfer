@@ -12,4 +12,6 @@ pub mod load_plan;
 pub mod materialize_qwen3;
 pub mod one_step_actual;
 pub mod one_step_golden;
+#[cfg(feature = "runtime-qwen3")]
+pub mod runtime_bridge;
 pub mod weights;
