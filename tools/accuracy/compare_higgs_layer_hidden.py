@@ -73,6 +73,7 @@ def main() -> None:
     print("name                         max_abs   mean_abs    p99_abs       rmse      cosine")
 
     rows: list[DriftStats] = []
+    rows.append(stats("embedding.last_hidden.bf16", golden["embedding.last_hidden.bf16"], actual["embedding.last_hidden.bf16"]))
     for layer_idx in range(NUM_LAYERS):
         name = f"layer.{layer_idx:02}.last_hidden.bf16"
         rows.append(stats(name, golden[name], actual[name]))

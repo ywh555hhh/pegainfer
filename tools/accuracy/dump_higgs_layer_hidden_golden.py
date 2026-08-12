@@ -68,6 +68,7 @@ def main() -> None:
     row_idx = torch.arange(len(prompt_ids), device=args.device)
 
     backbone = load_backbone(model_file, text_cfg, args.device)
+    embedding_hidden: torch.Tensor | None = None
     layer_snapshots: list[torch.Tensor | None] = [None] * len(backbone.layers)
 
     def make_hook(layer_idx: int):
@@ -79,7 +80,12 @@ def main() -> None:
 
         return hook
 
-    hooks = [layer.register_forward_hook(make_hook(i)) for i, layer in enumerate(backbone.layers)]
+    def embedding_hook(_module, _inputs, output):
+        nonlocal embedding_hidden
+        embedding_hidden = output[row_idx, prompt_lens_device - 1, :].detach().contiguous().clone()
+
+    hooks = [backbone.embed_tokens.register_forward_hook(embedding_hook)]
+    hooks.extend(layer.register_forward_hook(make_hook(i)) for i, layer in enumerate(backbone.layers))
     try:
         with torch.inference_mode():
             out = backbone(
@@ -95,10 +101,13 @@ def main() -> None:
     final_hidden = out.last_hidden_state[
         row_idx, prompt_lens_device - 1, :
     ].detach().contiguous()
+    if embedding_hidden is None:
+        raise RuntimeError("missing embedding snapshot")
     tensors = {
         "prompt.input_ids_padded": input_ids.cpu().to(torch.int64),
         "prompt.attention_mask": attention_mask.cpu().to(torch.int64),
         "prompt.lengths": prompt_lens.cpu(),
+        "embedding.last_hidden.bf16": embedding_hidden.cpu().to(torch.bfloat16),
         "final_hidden.bf16": final_hidden.cpu().to(torch.bfloat16),
     }
     for layer_idx, hidden in enumerate(layer_snapshots):

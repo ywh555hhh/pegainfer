@@ -419,6 +419,7 @@ pub struct PrefillHiddenResult {
 
 #[derive(Clone, Debug)]
 pub struct PrefillLayerHiddenResult {
+    pub embedding_hidden_bf16: Vec<half::bf16>,
     pub layer_hidden_bf16: Vec<Vec<half::bf16>>,
     pub final_normed_bf16: Vec<half::bf16>,
 }
@@ -1299,12 +1300,19 @@ impl LocalQwen3Lane {
         prompt: &[u32],
         kv_view: &KvView,
     ) -> Result<PrefillLayerHiddenResult> {
-        let (layer_hidden, final_normed) = self.model.prefill_last_hidden_layer_snapshots(
-            prompt,
-            kv_view,
-            self.kv_buffer.buffer(),
-            &self.layout,
-        )?;
+        let (embedding_hidden, layer_hidden, final_normed) =
+            self.model.prefill_last_hidden_layer_snapshots(
+                prompt,
+                kv_view,
+                self.kv_buffer.buffer(),
+                &self.layout,
+            )?;
+        let embedding_hidden_bf16 = self
+            .model
+            .device_ctx()
+            .stream
+            .clone_dtoh(&embedding_hidden.data)
+            .map_err(|e| anyhow::anyhow!("D2H embedding hidden copy failed: {e}"))?;
         let mut layer_hidden_bf16 = Vec::with_capacity(layer_hidden.len());
         for hidden in layer_hidden {
             layer_hidden_bf16.push(
@@ -1323,6 +1331,7 @@ impl LocalQwen3Lane {
             .map_err(|e| anyhow::anyhow!("D2H final normed hidden copy failed: {e}"))?;
         self.model.device_ctx().sync()?;
         Ok(PrefillLayerHiddenResult {
+            embedding_hidden_bf16,
             layer_hidden_bf16,
             final_normed_bf16,
         })

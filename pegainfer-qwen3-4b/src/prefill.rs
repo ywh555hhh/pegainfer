@@ -433,10 +433,11 @@ impl Qwen3Model {
         kv_view: &KvView,
         kv_buffer: &CudaSlice<bf16>,
         layout: &KvLayout,
-    ) -> Result<(Vec<DeviceVec>, DeviceVec)> {
+    ) -> Result<(DeviceVec, Vec<DeviceVec>, DeviceVec)> {
         anyhow::ensure!(!prompt.is_empty(), "prompt must not be empty");
 
         let mut hidden = self.get_embeddings_batch(prompt)?;
+        let embedding_snapshot = ops::extract_vec(&self.ctx, &hidden, prompt.len() - 1)?;
         let start_position = kv_view.seq_len() - prompt.len();
         let plan = PrefillPagedPlan::from_raw_batch_with_cta_tile_q(
             &self.ctx,
@@ -485,7 +486,7 @@ impl Qwen3Model {
             &self.norm,
             self.config.rms_norm_eps,
         )?;
-        Ok((layer_snapshots, final_normed))
+        Ok((embedding_snapshot, layer_snapshots, final_normed))
     }
 
     fn process_all_layers_batch_multi(

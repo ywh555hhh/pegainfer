@@ -35,6 +35,7 @@ fn main() -> Result<()> {
     let summary = write_layer_hidden_dump(
         &args.out,
         &prompt,
+        &hidden.embedding_hidden_bf16,
         &hidden.layer_hidden_bf16,
         &hidden.final_normed_bf16,
     )?;
