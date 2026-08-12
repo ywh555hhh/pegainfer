@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import platform
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +34,48 @@ REQUIRED_SPECIALS = ("<|tts|>", "<|ref_audio|>", "<|text|>", "<|audio|>")
 DEFAULT_MODEL_ID = "bosonai/higgs-tts-3-4b"
 DEFAULT_REVISION = "7556c17e05201fccd9c8cc120bc216dcc7b5d561"
 DEFAULT_PROMPTS = ("Hello from PegaInfer.",)
+
+
+def git_short_commit(path: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else "unknown"
+
+
+def load_sglang_omni_reference(
+    source_dir: str,
+    *,
+    required: bool,
+) -> dict[str, Any]:
+    if not source_dir:
+        if required:
+            raise ValueError("--require-sglang-omni-source requires --sglang-omni-src")
+        return {}
+
+    src = Path(source_dir).resolve()
+    if not (src / "sglang_omni/models/higgs_tts/text_tokenizer.py").exists():
+        raise FileNotFoundError(f"SGLang-Omni source missing Higgs tokenizer: {src}")
+    sys.path.insert(0, str(src))
+    try:
+        tokenizer_mod = importlib.import_module(
+            "sglang_omni.models.higgs_tts.text_tokenizer"
+        )
+        modeling_mod = importlib.import_module("sglang_omni.models.higgs_tts.modeling")
+    except Exception:
+        if required:
+            raise
+        return {}
+
+    return {
+        "source_dir": str(src),
+        "source_commit": git_short_commit(src),
+        "tokenizer_adapter_cls": tokenizer_mod.HiggsTokenizerAdapter,
+        "fused_head_cls": modeling_mod.HiggsFusedMultiTextHead,
+    }
 
 
 class HiggsTokenizerAdapter:
@@ -132,10 +177,36 @@ def load_modality_head_weight(model_file: Path, device: str) -> torch.Tensor:
     return weight.to(device=device, dtype=torch.bfloat16)
 
 
-def load_tokenizer(snapshot_dir: Path) -> HiggsTokenizerAdapter:
+def load_tokenizer(snapshot_dir: Path, adapter_cls: type[Any]) -> Any:
     raw = Tokenizer.from_file(str(snapshot_dir / "tokenizer.json"))
     tokenizer = PreTrainedTokenizerFast(tokenizer_object=raw)
-    return HiggsTokenizerAdapter(tokenizer)
+    return adapter_cls(tokenizer)
+
+
+def compute_modality_logits(
+    last_hidden: torch.Tensor,
+    modality_weight: torch.Tensor,
+    audio_cfg: dict[str, Any],
+    reference: dict[str, Any],
+) -> torch.Tensor:
+    head_cls = reference.get("fused_head_cls")
+    if head_cls is None:
+        logits = F.linear(last_hidden, modality_weight)
+        return logits.reshape(
+            last_hidden.shape[0],
+            int(audio_cfg["num_codebooks"]),
+            int(audio_cfg["vocab_size"]),
+        )
+
+    head = head_cls(
+        num_codebooks=int(audio_cfg["num_codebooks"]),
+        vocab_size=int(audio_cfg["vocab_size"]),
+        hidden_size=last_hidden.shape[-1],
+    ).to(device=last_hidden.device, dtype=torch.bfloat16)
+    head.eval()
+    with torch.no_grad():
+        head.weight.copy_(modality_weight)
+    return head.generate(last_hidden)
 
 
 def main() -> None:
@@ -147,6 +218,16 @@ def main() -> None:
     ap.add_argument("--prompt", action="append", default=[])
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--download", action="store_true")
+    ap.add_argument(
+        "--sglang-omni-src",
+        default="",
+        help="Optional SGLang-Omni source tree; imports Higgs tokenizer/head modules directly.",
+    )
+    ap.add_argument(
+        "--require-sglang-omni-source",
+        action="store_true",
+        help="Fail if --sglang-omni-src cannot provide the Higgs reference modules.",
+    )
     args = ap.parse_args()
 
     torch.set_grad_enabled(False)
@@ -183,7 +264,12 @@ def main() -> None:
     text_cfg = dict(config["text_config"])
     audio_cfg = dict(config["audio_encoder_config"])
     prompts = args.prompt or list(DEFAULT_PROMPTS)
-    adapter = load_tokenizer(snapshot_dir)
+    reference = load_sglang_omni_reference(
+        args.sglang_omni_src,
+        required=args.require_sglang_omni_source,
+    )
+    adapter_cls = reference.get("tokenizer_adapter_cls", HiggsTokenizerAdapter)
+    adapter = load_tokenizer(snapshot_dir, adapter_cls)
     prompt_ids = [adapter.build_prompt(p) for p in prompts]
     max_len = max(len(x) for x in prompt_ids)
     pad_id = int(text_cfg.get("eos_token_id") or 151643)
@@ -201,7 +287,7 @@ def main() -> None:
         hidden = out.last_hidden_state
         row_idx = torch.arange(len(prompts), device=args.device)
         last_hidden = hidden[row_idx, prompt_lens.to(args.device) - 1, :].contiguous()
-        logits = F.linear(last_hidden, modality_weight).reshape(len(prompts), int(audio_cfg["num_codebooks"]), int(audio_cfg["vocab_size"]))
+        logits = compute_modality_logits(last_hidden, modality_weight, audio_cfg, reference)
         logprobs = torch.log_softmax(logits.to(torch.float32), dim=-1)
         top_vals, top_ids = torch.topk(logprobs, k=64, dim=-1)
         argmax_ids = torch.argmax(logits, dim=-1).to(torch.int64)
@@ -223,6 +309,10 @@ def main() -> None:
         "model_revision": args.revision,
         "reference": "SGLang-Omni Higgs prompt builder plus Transformers Qwen3 backbone plus SGLang fused modality head semantics",
         "sglang_omni_reference_files": "sglang_omni/models/higgs_tts/text_tokenizer.py;sglang_omni/models/higgs_tts/modeling.py;sglang_omni/models/higgs_tts/model.py",
+        "sglang_omni_source_dir": reference.get("source_dir", ""),
+        "sglang_omni_source_commit": reference.get("source_commit", ""),
+        "sglang_omni_direct_imports": "text_tokenizer.py;modeling.py" if reference else "",
+        "sglang_omni_full_model_imported": "false",
         "prompt_count": str(len(prompts)),
         "prompts_json": json.dumps(prompts, ensure_ascii=False),
         "num_codebooks": str(audio_cfg["num_codebooks"]),
