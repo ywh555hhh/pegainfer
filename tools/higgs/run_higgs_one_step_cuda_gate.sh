@@ -142,6 +142,7 @@ cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
   --mode semantic \
   --golden "$golden" \
   --actual "$actual" | tee "$compare_log"
+grep -q "higgs one-step semantic comparison: ok" "$compare_log"
 
 echo "==> Smoke-testing retained prompt session"
 cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
@@ -149,12 +150,14 @@ cargo run --release -p pegainfer-higgs-audio --features runtime-qwen3 \
   --model-dir "$model_dir" \
   --golden "$golden" \
   --out "$session_actual" | tee "$session_smoke_log"
+grep -q "duplicate_request_id_guard: ok" "$session_smoke_log"
 
 echo "==> Running session semantic comparison"
 cargo run --release -p pegainfer-higgs-audio --bin higgs_compare_one_step -- \
   --mode semantic \
   --golden "$golden" \
   --actual "$session_actual" | tee "$session_compare_log"
+grep -q "higgs one-step semantic comparison: ok" "$session_compare_log"
 
 echo "==> Auto config view"
 find "$auto_view" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
