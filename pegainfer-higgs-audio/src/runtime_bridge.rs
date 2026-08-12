@@ -7,6 +7,7 @@ use pegainfer_qwen3_4b::runtime::Qwen3Executor;
 
 use crate::config::HiggsConfig;
 use crate::load_plan::HiggsRuntimeLoadPlan;
+use crate::materialize_qwen3::write_qwen3_config_view;
 use crate::one_step_actual::{
     OneStepActualSummary, load_fused_audio_head_bf16, load_prompt_from_golden,
     write_one_step_actual, write_one_step_actual_with_gpu_audio_head,
@@ -23,6 +24,7 @@ pub enum AudioHeadBackend {
 pub enum HiggsRuntimeSource<'a> {
     Qwen3BodyView { qwen3_body_dir: &'a Path },
     Qwen3ConfigAlias { qwen3_config_dir: &'a Path },
+    AutoConfigAlias { qwen3_config_dir: &'a Path },
 }
 
 pub struct HiggsOneStepRuntime {
@@ -87,17 +89,37 @@ fn load_qwen3_executor(
             Qwen3Executor::from_runtime(qwen3_body_dir, false, &[device_ordinal])
         }
         HiggsRuntimeSource::Qwen3ConfigAlias { qwen3_config_dir } => {
-            let qwen3_config_dir = path_str(qwen3_config_dir, "qwen3 config dir")?;
-            let model_dir_str = path_str(model_dir, "model dir")?;
-            Qwen3Executor::from_runtime_with_weight_source(
-                qwen3_config_dir,
-                Some(model_dir_str),
-                qwen3_tensor_name_aliases(model_dir)?,
-                false,
-                &[device_ordinal],
-            )
+            load_qwen3_executor_from_alias_config(model_dir, qwen3_config_dir, device_ordinal)
+        }
+        HiggsRuntimeSource::AutoConfigAlias { qwen3_config_dir } => {
+            prepare_qwen3_config_view(model_dir, qwen3_config_dir)?;
+            load_qwen3_executor_from_alias_config(model_dir, qwen3_config_dir, device_ordinal)
         }
     }
+}
+
+fn load_qwen3_executor_from_alias_config(
+    model_dir: &Path,
+    qwen3_config_dir: &Path,
+    device_ordinal: usize,
+) -> Result<Qwen3Executor> {
+    let qwen3_config_dir = path_str(qwen3_config_dir, "qwen3 config dir")?;
+    let model_dir_str = path_str(model_dir, "model dir")?;
+    Qwen3Executor::from_runtime_with_weight_source(
+        qwen3_config_dir,
+        Some(model_dir_str),
+        qwen3_tensor_name_aliases(model_dir)?,
+        false,
+        &[device_ordinal],
+    )
+}
+
+fn prepare_qwen3_config_view(model_dir: &Path, qwen3_config_dir: &Path) -> Result<()> {
+    let config = HiggsConfig::from_model_dir(model_dir)?;
+    let manifest = HiggsWeightManifest::from_model_dir(model_dir)?;
+    let plan = HiggsRuntimeLoadPlan::from_manifest(&config, &manifest)?;
+    write_qwen3_config_view(qwen3_config_dir, &config, &plan)?;
+    Ok(())
 }
 
 fn qwen3_tensor_name_aliases(model_dir: &Path) -> Result<TensorNameAliases> {
