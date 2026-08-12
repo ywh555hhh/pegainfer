@@ -9,8 +9,9 @@ use crate::config::HiggsConfig;
 use crate::load_plan::HiggsRuntimeLoadPlan;
 use crate::materialize_qwen3::write_qwen3_config_view;
 use crate::one_step_actual::{
-    OneStepActualSummary, load_fused_audio_head_bf16, load_prompt_from_golden,
-    write_one_step_actual, write_one_step_actual_with_gpu_audio_head,
+    OneStepActualSummary, OneStepAudioPrediction, PromptTensors, compute_one_step_audio_prediction,
+    compute_one_step_audio_prediction_gpu_bf16, load_fused_audio_head_bf16,
+    load_prompt_from_golden, write_one_step_actual_prediction,
 };
 use crate::weights::HiggsWeightManifest;
 
@@ -32,6 +33,13 @@ pub struct HiggsOneStepRuntime {
     audio_head: Vec<bf16>,
     audio_head_backend: AudioHeadBackend,
     device_ordinal: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HiggsOneStepPrefill {
+    pub prompt_tokens: usize,
+    pub final_hidden_bf16: Vec<bf16>,
+    pub audio: OneStepAudioPrediction,
 }
 
 impl HiggsOneStepRuntime {
@@ -59,22 +67,41 @@ impl HiggsOneStepRuntime {
     ) -> Result<OneStepActualSummary> {
         let prompt = load_prompt_from_golden(golden)?;
         let prompt_ids = prompt.prompt_ids()?;
+        let prefill = self.prefill_audio_from_prompt_ids(&prompt_ids)?;
+        write_one_step_actual_prediction(out, &prompt, &prefill.final_hidden_bf16, &prefill.audio)
+    }
+
+    pub fn prefill_audio_from_prompt(
+        &mut self,
+        prompt: &PromptTensors,
+    ) -> Result<HiggsOneStepPrefill> {
+        let prompt_ids = prompt.prompt_ids()?;
+        self.prefill_audio_from_prompt_ids(&prompt_ids)
+    }
+
+    pub fn prefill_audio_from_prompt_ids(
+        &mut self,
+        prompt_ids: &[u32],
+    ) -> Result<HiggsOneStepPrefill> {
         let hidden = self
             .executor
-            .prefill_last_hidden_bf16(prompt_ids)?
+            .prefill_last_hidden_bf16(prompt_ids.to_vec())?
             .hidden_bf16;
-        match self.audio_head_backend {
-            AudioHeadBackend::CudaBf16 => write_one_step_actual_with_gpu_audio_head(
-                out,
-                &prompt,
+        let audio = match self.audio_head_backend {
+            AudioHeadBackend::CudaBf16 => compute_one_step_audio_prediction_gpu_bf16(
                 &hidden,
                 &self.audio_head,
                 self.device_ordinal,
-            ),
+            )?,
             AudioHeadBackend::CpuFp32 => {
-                write_one_step_actual(out, &prompt, &hidden, &self.audio_head)
+                compute_one_step_audio_prediction(&hidden, &self.audio_head)?
             }
-        }
+        };
+        Ok(HiggsOneStepPrefill {
+            prompt_tokens: prompt_ids.len(),
+            final_hidden_bf16: hidden,
+            audio,
+        })
     }
 }
 

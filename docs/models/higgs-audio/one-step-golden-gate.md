@@ -164,6 +164,13 @@ safetensors writer consumes that prediction as a separate step. This keeps the
 golden dump path intact while making the next runtime slice less file-output
 centric.
 
+`HiggsOneStepRuntime` now exposes `prefill_audio_from_prompt_ids`, which runs a
+raw token prompt through the aliased Qwen3 body and returns
+`HiggsOneStepPrefill { prompt_tokens, final_hidden_bf16, audio }`. The golden
+dump path loads prompt tensors from the fixture and then calls this runtime API;
+it is no longer the only way to obtain Higgs audio logits from the bridge. This
+is still a one-shot diagnostic prefill path, not a retained KV-cache session.
+
 ## Qwen3 Runtime Bridge
 
 The sixth slice originally added a bridge materializer that rewrites the single
@@ -626,6 +633,8 @@ upstream issue update:
   phases so reviewers can see the current backend/runtime boundary explicitly.
 - Split one-step audio prediction from safetensors writing so future decode or
   serving paths can reuse logits/top-k/argmax without going through a dump file.
+- Added a prompt-id runtime bridge entrypoint that returns Higgs prefill hidden
+  state plus audio prediction before any golden-file writer is involved.
 - Identified and fixed a HuggingFace/meta-device RoPE buffer bug in the golden
   loader; the suspected CUDA RoPE failure was a false-positive.
 - Added strict and semantic comparison modes. Corrected 4090 run passes semantic
