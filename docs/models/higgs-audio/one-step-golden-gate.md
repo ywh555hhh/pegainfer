@@ -420,13 +420,35 @@ The preferred CUDA repro entrypoint is:
 ```bash
 tools/higgs/run_higgs_one_step_cuda_gate.sh \
   --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 \
-  --label f607edb
+  --label 37f8eb6
 ```
 
 That script runs the `runtime-qwen3` bin check, dumps the CUDA bf16 actual file
-through the auto alias-view path, runs the semantic comparator, and records the
-small generated Qwen3 config view. Add `--profile` to capture an NSYS report for
-the same actual-dump path.
+through the auto alias-view path, runs the semantic comparator, smoke-tests the
+prompt-only retained KV session path, compares that session actual against the
+same golden, and records the small generated Qwen3 config view. Add `--profile`
+to capture an NSYS report for the same actual-dump path.
+
+The script was validated on the 4090-D host at `37f8eb6` after the retained
+prompt-session bridge landed and produced both expected actual files:
+
+```text
+actual:      /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-37f8eb6.safetensors
+session:     /data/results/pegainfer/higgs-audio/actual/higgs-one-step-session-cuda-bf16-auto-37f8eb6.safetensors
+compare_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-auto-37f8eb6.txt
+session_log: /data/results/pegainfer/higgs-audio/actual/semantic-compare-session-auto-37f8eb6.txt
+semantic comparison: ok
+session semantic comparison: ok
+auto view:
+  config.json 306 bytes
+  generation_config.json 29 bytes
+  higgs-qwen3-tensor-aliases.json 34933 bytes
+```
+
+The session smoke retains the prompt KV under request id `1`, emits the same
+one-step audio prediction, and drops the request explicitly. This proves the
+current Higgs bridge can own a request id and prompt-only KV lifecycle without
+registering an invalid generated text token.
 
 The script was validated on the 4090-D host at `7d5ab1d` after the prompt-id
 prefill bridge split and produced:
