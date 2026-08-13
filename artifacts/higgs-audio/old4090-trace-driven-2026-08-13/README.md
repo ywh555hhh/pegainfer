@@ -21,6 +21,7 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `layer0-stages-vs-trace-old4090-13651bf.{txt,json}`: layer0 stage actual vs AutoDL trace golden comparison using `--alias-set layer0-stage`.
 - `higgs-layer1-stages-old4090-dev.safetensors`: PegaInfer layer1 stage actual dump generated with generalized `--layer-idx 1` support.
 - `layer1-stages-vs-trace-old4090-dev-v2.{txt,json}`: layer1 stage actual vs AutoDL trace golden comparison using execution-ordered `--alias-set layer-stage`.
+- `layer1-qk-norm-drift-old4090-dev.json`: q/k RMSNorm diagnostic recomputing HF-like norm variants from golden/actual projections plus checkpoint q/k norm weights.
 
 ## Results
 
@@ -46,6 +47,10 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - first execution-order alert: `layer1.q_norm.bf16 -> layer.01.self_attn.q_norm.output.bf16`
   - additional alerts: `k_norm`, `gate_proj`, `up_proj`, `output_hidden`
   - worst mean abs: `layer1.gate_proj.bf16 -> layer.01.mlp.gate_proj.output.bf16:0.008645`
+- Layer1 q/k RMSNorm recompute diagnostic:
+  - `hf_like_bf16_mid` recomputed from actual q/k projections matches PegaInfer actual q/k norm exactly (`actual_kernel_mean=0.00000000` for both q and k)
+  - the same formula recomputed from golden q/k projections matches SGLang/Transformers trace q/k norm exactly (`golden_formula_mean=0.00000000` for both q and k)
+  - layer1 q/k norm drift is therefore explained by upstream q/k projection drift propagation, not by a q/k RMSNorm kernel semantics mismatch
 
 ## Interpretation
 
@@ -55,9 +60,10 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 2. The prompt and embedding path are exact.
 3. Layer0 substage outputs match the AutoDL SGLang-Omni source-reference trace within the current thresholds.
 4. The first layer-level drift worth investigating is `layer.01.last_hidden.bf16`.
-5. Layer1 substage comparison narrows the first execution-order drift to q/k RMSNorm (`layer1.q_norm.bf16`, then `layer1.k_norm.bf16`), after input hidden and q/k/v projections remain within thresholds.
+5. Layer1 substage comparison initially narrowed the first execution-order alert to q/k RMSNorm (`layer1.q_norm.bf16`, then `layer1.k_norm.bf16`), after input hidden and q/k/v projections remain within thresholds.
+6. The q/k RMSNorm recompute diagnostic rules out a q/k RMSNorm semantics mismatch: both golden and actual projections reproduce their corresponding q/k norm tensors exactly under the HF-like bf16-mid rounding formula.
 
-Next development target: inspect q/k RMSNorm shape/layout/epsilon/rounding for layer1, then extend the trace reference to include rope and attention-output internals if q/k norm alone does not explain the downstream drift. Do not hack around drift by injecting trace tensors or hardcoding outputs; the trace is only an oracle for locating the first semantic/numeric divergence.
+Next development target: treat layer1 q/k norm as explained propagation, then inspect whether layer0 output-hidden drift and layer1 q/k projection drift are acceptable BF16/cuBLAS accumulation drift or whether a more exact projection/attention diagnostic is needed. Do not hack around drift by injecting trace tensors or hardcoding outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -70,6 +76,7 @@ d6932c51429641c2970ffe3fdc3699d3708bb86fce3e811599486b197f152c4e  layer0-stages-
 b860082458890a3b7c6baec04d51ff2f0f193dd0041f88a9491d4f33ca505cb3  layer0-stages-vs-trace-old4090-13651bf.txt
 fc19d6cdf6b5f77f45fea35d2c7f82027ac18416b91e6827228ed748648448f1  layer1-stages-vs-trace-old4090-dev-v2.json
 c26fc5f889c1ac0ef9f72454fb0ad4dc14112d117da0a588955a0591f5461e89  layer1-stages-vs-trace-old4090-dev-v2.txt
+e0c205a771b1cf604d5631198fedd00111749b4dce017ca022a34eef66495961  layer1-qk-norm-drift-old4090-dev.json
 f9a64a5a2961e98036681f70f508c801f760586adf664506122cef1e742d4ff3  one-step-actual-vs-trace-old4090-ef7b8d4.json
 6647b9e4154961c200f18810608a99fbc28aa64277364cd34429a906ea0837a0  one-step-actual-vs-trace-old4090-ef7b8d4.txt
 a3639507ad3a91b8184eea1684f81470374d5f050c3ab6087c96642d3a849cae  prefill-layer-hidden-vs-trace-old4090-ef7b8d4.json

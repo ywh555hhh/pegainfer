@@ -1,0 +1,472 @@
+{
+  "actual": "/data/results/pegainfer/higgs-audio/actual/higgs-layer1-stages-old4090-dev.safetensors",
+  "direct": {
+    "k": {
+      "norm_actual_vs_golden": {
+        "cosine": 0.9999916553497314,
+        "max_abs": 0.25,
+        "mean_abs": 0.004566519521176815,
+        "name": "k.norm_actual_vs_golden",
+        "p99_abs": 0.03125,
+        "rmse": 0.011958139948546886,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "norm_head_mean_abs": [
+        0.0032677650451660156,
+        0.0026938915252685547,
+        0.0050047338008880615,
+        0.00533294677734375,
+        0.005963325500488281,
+        0.003946088254451752,
+        0.0037664175033569336,
+        0.006556987762451172
+      ],
+      "proj_actual_vs_golden": {
+        "cosine": 0.9999939203262329,
+        "max_abs": 0.0078125,
+        "mean_abs": 0.0007371213287115097,
+        "name": "k.proj_actual_vs_golden",
+        "p99_abs": 0.00390625,
+        "rmse": 0.0012576375156641006,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "proj_head_mean_abs": [
+        0.0007429122924804688,
+        0.0005477070808410645,
+        0.0007366612553596497,
+        0.0008792281150817871,
+        0.0006613731384277344,
+        0.0005728974938392639,
+        0.0009256601333618164,
+        0.000830531120300293
+      ]
+    },
+    "q": {
+      "norm_actual_vs_golden": {
+        "cosine": 0.9999922513961792,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0033242222853004932,
+        "name": "q.norm_actual_vs_golden",
+        "p99_abs": 0.03125,
+        "rmse": 0.0064186216332018375,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "norm_head_mean_abs": [
+        0.003470897674560547,
+        0.00429534912109375,
+        0.0038089752197265625,
+        0.003459930419921875,
+        0.0028901100158691406,
+        0.004261970520019531,
+        0.003284454345703125,
+        0.003442823886871338,
+        0.004784107208251953,
+        0.0028171539306640625,
+        0.0025396347045898438,
+        0.0025968551635742188,
+        0.004980325698852539,
+        0.00417327880859375,
+        0.005788873881101608,
+        0.0050678253173828125,
+        0.0017910003662109375,
+        0.0026540756225585938,
+        0.0030765533447265625,
+        0.0034633874893188477,
+        0.0033826828002929688,
+        0.0019054412841796875,
+        0.002154111862182617,
+        0.004442930221557617,
+        0.0016880035400390625,
+        0.00215911865234375,
+        0.003509521484375,
+        0.004372596740722656,
+        0.0031905174255371094,
+        0.0026488900184631348,
+        0.001787424087524414,
+        0.002486288547515869
+      ],
+      "proj_actual_vs_golden": {
+        "cosine": 0.9999958276748657,
+        "max_abs": 0.0078125,
+        "mean_abs": 0.0005306036910042167,
+        "name": "q.proj_actual_vs_golden",
+        "p99_abs": 0.00390625,
+        "rmse": 0.0009445955511182547,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "proj_head_mean_abs": [
+        0.0006628036499023438,
+        0.0005068778991699219,
+        0.0005974173545837402,
+        0.0006292462348937988,
+        0.0005519390106201172,
+        0.000500040128827095,
+        0.0005796849727630615,
+        0.0005212128162384033,
+        0.0007277131080627441,
+        0.00040411949157714844,
+        0.0005195736885070801,
+        0.0004241466522216797,
+        0.0007343292236328125,
+        0.0004493892192840576,
+        0.000580670777708292,
+        0.0006825923919677734,
+        0.0005322694778442383,
+        0.00042557716369628906,
+        0.0005219578742980957,
+        0.0005955696105957031,
+        0.0005213171243667603,
+        0.00046443939208984375,
+        0.0003784671425819397,
+        0.000531613826751709,
+        0.0004456043243408203,
+        0.00048160552978515625,
+        0.0005557537078857422,
+        0.0005970001220703125,
+        0.00035375356674194336,
+        0.0005128383636474609,
+        0.00048601627349853516,
+        0.0005037784576416016
+      ]
+    }
+  },
+  "eps": 1e-06,
+  "golden": "artifacts/higgs-audio/autodl-4090-sglang-omni-trace-2026-08-13/higgs-one-step-sglang-omni-trace-autodl.safetensors",
+  "head_dim": 128,
+  "layer_idx": 1,
+  "model_safetensors": "/data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561/model.safetensors",
+  "variants": [
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 1.0000004768371582,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "q.bf16_mid_fp32_weight.actual_proj_vs_actual_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999922513961792,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0033242222853004932,
+        "name": "q.bf16_mid_fp32_weight.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.0064186216332018375,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 1.0000005960464478,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "q.bf16_mid_fp32_weight.golden_proj_vs_golden_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "tensor": "q",
+      "variant": "bf16_mid_fp32_weight"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 0.9999967813491821,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0015559461899101734,
+        "name": "q.fp32_no_mid_round.actual_proj_vs_actual_norm",
+        "p99_abs": 0.015625,
+        "rmse": 0.004274684004485607,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999916553497314,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0038218945264816284,
+        "name": "q.fp32_no_mid_round.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.006713894195854664,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 0.9999967813491821,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0015506837517023087,
+        "name": "q.fp32_no_mid_round.golden_proj_vs_golden_norm",
+        "p99_abs": 0.015625,
+        "rmse": 0.004334423691034317,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "tensor": "q",
+      "variant": "fp32_no_mid_round"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 1.0000004768371582,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "q.hf_like_bf16_mid.actual_proj_vs_actual_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999922513961792,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0033242222853004932,
+        "name": "q.hf_like_bf16_mid.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.0064186216332018375,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 1.0000005960464478,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "q.hf_like_bf16_mid.golden_proj_vs_golden_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "tensor": "q",
+      "variant": "hf_like_bf16_mid"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 0.9999967813491821,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0015559461899101734,
+        "name": "q.single_round_fp32_weight.actual_proj_vs_actual_norm",
+        "p99_abs": 0.015625,
+        "rmse": 0.004274684004485607,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999916553497314,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0038218945264816284,
+        "name": "q.single_round_fp32_weight.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.006713894195854664,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 0.9999967813491821,
+        "max_abs": 0.0625,
+        "mean_abs": 0.0015506837517023087,
+        "name": "q.single_round_fp32_weight.golden_proj_vs_golden_norm",
+        "p99_abs": 0.015625,
+        "rmse": 0.004334423691034317,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "tensor": "q",
+      "variant": "single_round_fp32_weight"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 1.0000001192092896,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "k.bf16_mid_fp32_weight.actual_proj_vs_actual_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999916553497314,
+        "max_abs": 0.25,
+        "mean_abs": 0.004566519521176815,
+        "name": "k.bf16_mid_fp32_weight.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.011958139948546886,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 1.000000238418579,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "k.bf16_mid_fp32_weight.golden_proj_vs_golden_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "tensor": "k",
+      "variant": "bf16_mid_fp32_weight"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 0.9999949932098389,
+        "max_abs": 0.125,
+        "mean_abs": 0.002475932240486145,
+        "name": "k.fp32_no_mid_round.actual_proj_vs_actual_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.008897341787815094,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999918937683105,
+        "max_abs": 0.125,
+        "mean_abs": 0.005116804502904415,
+        "name": "k.fp32_no_mid_round.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.011398980394005775,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 0.9999954700469971,
+        "max_abs": 0.125,
+        "mean_abs": 0.002152055501937866,
+        "name": "k.fp32_no_mid_round.golden_proj_vs_golden_norm",
+        "p99_abs": 0.02765655517578125,
+        "rmse": 0.008445634506642818,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "tensor": "k",
+      "variant": "fp32_no_mid_round"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 1.0000001192092896,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "k.hf_like_bf16_mid.actual_proj_vs_actual_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999916553497314,
+        "max_abs": 0.25,
+        "mean_abs": 0.004566519521176815,
+        "name": "k.hf_like_bf16_mid.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.011958139948546886,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 1.000000238418579,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "k.hf_like_bf16_mid.golden_proj_vs_golden_norm",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "tensor": "k",
+      "variant": "hf_like_bf16_mid"
+    },
+    {
+      "recompute_from_actual_proj_vs_actual_norm": {
+        "cosine": 0.9999949932098389,
+        "max_abs": 0.125,
+        "mean_abs": 0.002475932240486145,
+        "name": "k.single_round_fp32_weight.actual_proj_vs_actual_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.008897341787815094,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_actual_proj_vs_golden_norm": {
+        "cosine": 0.9999918937683105,
+        "max_abs": 0.125,
+        "mean_abs": 0.005116804502904415,
+        "name": "k.single_round_fp32_weight.actual_proj_vs_golden_norm",
+        "p99_abs": 0.03125,
+        "rmse": 0.011398980394005775,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_from_golden_proj_vs_golden_norm": {
+        "cosine": 0.9999954700469971,
+        "max_abs": 0.125,
+        "mean_abs": 0.002152055501937866,
+        "name": "k.single_round_fp32_weight.golden_proj_vs_golden_norm",
+        "p99_abs": 0.02765655517578125,
+        "rmse": 0.008445634506642818,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "tensor": "k",
+      "variant": "single_round_fp32_weight"
+    }
+  ]
+}
