@@ -1,0 +1,320 @@
+{
+  "actual": "/data/results/pegainfer/higgs-audio/actual/higgs-layer0-stages-old4090-13651bf.safetensors",
+  "alerts": 0,
+  "alias_set": "layer0-stage",
+  "common_tensors": 13,
+  "extra_actual": [],
+  "first_alert": "none",
+  "golden": "artifacts/higgs-audio/autodl-4090-sglang-omni-trace-2026-08-13/higgs-one-step-sglang-omni-trace-autodl.safetensors",
+  "items": [
+    {
+      "actual_name": "layer0.input_hidden.bf16",
+      "display_name": "layer0.input_hidden.bf16 -> embedding.sequence_hidden.bf16",
+      "golden_name": "embedding.sequence_hidden.bf16"
+    },
+    {
+      "actual_name": "layer0.input_norm.bf16",
+      "display_name": "layer0.input_norm.bf16 -> layer.00.input_layernorm.output.bf16",
+      "golden_name": "layer.00.input_layernorm.output.bf16"
+    },
+    {
+      "actual_name": "layer0.q_proj.bf16",
+      "display_name": "layer0.q_proj.bf16 -> layer.00.self_attn.q_proj.output.bf16",
+      "golden_name": "layer.00.self_attn.q_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.k_proj.bf16",
+      "display_name": "layer0.k_proj.bf16 -> layer.00.self_attn.k_proj.output.bf16",
+      "golden_name": "layer.00.self_attn.k_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.v_proj.bf16",
+      "display_name": "layer0.v_proj.bf16 -> layer.00.self_attn.v_proj.output.bf16",
+      "golden_name": "layer.00.self_attn.v_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.q_norm.bf16",
+      "display_name": "layer0.q_norm.bf16 -> layer.00.self_attn.q_norm.output.bf16",
+      "golden_name": "layer.00.self_attn.q_norm.output.bf16"
+    },
+    {
+      "actual_name": "layer0.k_norm.bf16",
+      "display_name": "layer0.k_norm.bf16 -> layer.00.self_attn.k_norm.output.bf16",
+      "golden_name": "layer.00.self_attn.k_norm.output.bf16"
+    },
+    {
+      "actual_name": "layer0.o_proj.bf16",
+      "display_name": "layer0.o_proj.bf16 -> layer.00.self_attn.o_proj.output.bf16",
+      "golden_name": "layer.00.self_attn.o_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.post_attn_norm.bf16",
+      "display_name": "layer0.post_attn_norm.bf16 -> layer.00.post_attention_layernorm.output.bf16",
+      "golden_name": "layer.00.post_attention_layernorm.output.bf16"
+    },
+    {
+      "actual_name": "layer0.gate_proj.bf16",
+      "display_name": "layer0.gate_proj.bf16 -> layer.00.mlp.gate_proj.output.bf16",
+      "golden_name": "layer.00.mlp.gate_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.up_proj.bf16",
+      "display_name": "layer0.up_proj.bf16 -> layer.00.mlp.up_proj.output.bf16",
+      "golden_name": "layer.00.mlp.up_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.down_proj.bf16",
+      "display_name": "layer0.down_proj.bf16 -> layer.00.mlp.down_proj.output.bf16",
+      "golden_name": "layer.00.mlp.down_proj.output.bf16"
+    },
+    {
+      "actual_name": "layer0.output_hidden.bf16",
+      "display_name": "layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16",
+      "golden_name": "layer.00.sequence_hidden.bf16"
+    }
+  ],
+  "missing_from_actual": [],
+  "prompt_exact": true,
+  "rows": [
+    {
+      "alert": false,
+      "cosine": 1.0000003576278687,
+      "dtype": "torch.bfloat16",
+      "exact": true,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "name": "layer0.input_hidden.bf16 -> embedding.sequence_hidden.bf16",
+      "p99_abs": 0.0,
+      "reason": "ok",
+      "rmse": 0.0,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999983310699463,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.0009765625,
+      "mean_abs": 9.12402720132377e-06,
+      "name": "layer0.input_norm.bf16 -> layer.00.input_layernorm.output.bf16",
+      "p99_abs": 6.103515625e-05,
+      "reason": "ok",
+      "rmse": 3.44419531757012e-05,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999994039535522,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.00390625,
+      "mean_abs": 6.131856935098767e-05,
+      "name": "layer0.q_proj.bf16 -> layer.00.self_attn.q_proj.output.bf16",
+      "p99_abs": 0.0009765625,
+      "reason": "ok",
+      "rmse": 0.0001729785290081054,
+      "shape": [
+        1,
+        4096
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999995231628418,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.001953125,
+      "mean_abs": 5.569917630054988e-05,
+      "name": "layer0.k_proj.bf16 -> layer.00.self_attn.k_proj.output.bf16",
+      "p99_abs": 0.00048828125,
+      "reason": "ok",
+      "rmse": 0.00015875164535827935,
+      "shape": [
+        1,
+        1024
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.999997615814209,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.00390625,
+      "mean_abs": 5.43985515832901e-05,
+      "name": "layer0.v_proj.bf16 -> layer.00.self_attn.v_proj.output.bf16",
+      "p99_abs": 0.000244140625,
+      "reason": "ok",
+      "rmse": 0.00015204738883767277,
+      "shape": [
+        1,
+        1024
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999986886978149,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.0625,
+      "mean_abs": 0.0010731250513345003,
+      "name": "layer0.q_norm.bf16 -> layer.00.self_attn.q_norm.output.bf16",
+      "p99_abs": 0.015625,
+      "reason": "ok",
+      "rmse": 0.0031344471499323845,
+      "shape": [
+        1,
+        4096
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999992847442627,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.125,
+      "mean_abs": 0.001158835832029581,
+      "name": "layer0.k_norm.bf16 -> layer.00.self_attn.k_norm.output.bf16",
+      "p99_abs": 0.015625,
+      "reason": "ok",
+      "rmse": 0.0051003918051719666,
+      "shape": [
+        1,
+        1024
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999975562095642,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.0625,
+      "mean_abs": 0.0004013009020127356,
+      "name": "layer0.o_proj.bf16 -> layer.00.self_attn.o_proj.output.bf16",
+      "p99_abs": 0.001220703125,
+      "reason": "ok",
+      "rmse": 0.00212067156098783,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999954700469971,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.00390625,
+      "mean_abs": 7.930924039101228e-05,
+      "name": "layer0.post_attn_norm.bf16 -> layer.00.post_attention_layernorm.output.bf16",
+      "p99_abs": 0.0003662109375,
+      "reason": "ok",
+      "rmse": 0.00019400520250201225,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999992847442627,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.0078125,
+      "mean_abs": 0.0003704950213432312,
+      "name": "layer0.gate_proj.bf16 -> layer.00.mlp.gate_proj.output.bf16",
+      "p99_abs": 0.00390625,
+      "reason": "ok",
+      "rmse": 0.000991760054603219,
+      "shape": [
+        1,
+        9728
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 1.0000004768371582,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.0078125,
+      "mean_abs": 0.000350122427335009,
+      "name": "layer0.up_proj.bf16 -> layer.00.mlp.up_proj.output.bf16",
+      "p99_abs": 0.00390625,
+      "reason": "ok",
+      "rmse": 0.0009047164930962026,
+      "shape": [
+        1,
+        9728
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999957084655762,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.125,
+      "mean_abs": 0.002306015696376562,
+      "name": "layer0.down_proj.bf16 -> layer.00.mlp.down_proj.output.bf16",
+      "p99_abs": 0.015625,
+      "reason": "ok",
+      "rmse": 0.004846055060625076,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    {
+      "alert": false,
+      "cosine": 0.9999939203262329,
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "max_abs": 0.25,
+      "mean_abs": 0.002617368008941412,
+      "name": "layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16",
+      "p99_abs": 0.03125,
+      "reason": "ok",
+      "rmse": 0.007614089176058769,
+      "shape": [
+        1,
+        2560
+      ]
+    }
+  ],
+  "worst_cosine": {
+    "alert": false,
+    "cosine": 0.9999939203262329,
+    "dtype": "torch.bfloat16",
+    "exact": false,
+    "max_abs": 0.25,
+    "mean_abs": 0.002617368008941412,
+    "name": "layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16",
+    "p99_abs": 0.03125,
+    "reason": "ok",
+    "rmse": 0.007614089176058769,
+    "shape": [
+      1,
+      2560
+    ]
+  },
+  "worst_mean_abs": {
+    "alert": false,
+    "cosine": 0.9999939203262329,
+    "dtype": "torch.bfloat16",
+    "exact": false,
+    "max_abs": 0.25,
+    "mean_abs": 0.002617368008941412,
+    "name": "layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16",
+    "p99_abs": 0.03125,
+    "reason": "ok",
+    "rmse": 0.007614089176058769,
+    "shape": [
+      1,
+      2560
+    ]
+  }
+}

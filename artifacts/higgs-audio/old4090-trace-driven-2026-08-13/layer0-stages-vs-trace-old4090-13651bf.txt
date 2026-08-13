@@ -1,0 +1,24 @@
+prompt_exact=True
+common_tensors=13
+missing_from_actual=0
+extra_actual=0
+name                                                       max_abs   mean_abs    p99_abs       rmse      cosine  exact  alert  reason
+layer0.input_hidden.bf16 -> embedding.sequence_hidden.bf16   0.000000   0.000000   0.000000   0.000000   1.000000  True  False  ok
+layer0.input_norm.bf16 -> layer.00.input_layernorm.output.bf16   0.000977   0.000009   0.000061   0.000034   0.999998 False  False  ok
+layer0.q_proj.bf16 -> layer.00.self_attn.q_proj.output.bf16   0.003906   0.000061   0.000977   0.000173   0.999999 False  False  ok
+layer0.k_proj.bf16 -> layer.00.self_attn.k_proj.output.bf16   0.001953   0.000056   0.000488   0.000159   1.000000 False  False  ok
+layer0.v_proj.bf16 -> layer.00.self_attn.v_proj.output.bf16   0.003906   0.000054   0.000244   0.000152   0.999998 False  False  ok
+layer0.q_norm.bf16 -> layer.00.self_attn.q_norm.output.bf16   0.062500   0.001073   0.015625   0.003134   0.999999 False  False  ok
+layer0.k_norm.bf16 -> layer.00.self_attn.k_norm.output.bf16   0.125000   0.001159   0.015625   0.005100   0.999999 False  False  ok
+layer0.o_proj.bf16 -> layer.00.self_attn.o_proj.output.bf16   0.062500   0.000401   0.001221   0.002121   0.999998 False  False  ok
+layer0.post_attn_norm.bf16 -> layer.00.post_attention_layernorm.output.bf16   0.003906   0.000079   0.000366   0.000194   0.999995 False  False  ok
+layer0.gate_proj.bf16 -> layer.00.mlp.gate_proj.output.bf16   0.007812   0.000370   0.003906   0.000992   0.999999 False  False  ok
+layer0.up_proj.bf16 -> layer.00.mlp.up_proj.output.bf16      0.007812   0.000350   0.003906   0.000905   1.000000 False  False  ok
+layer0.down_proj.bf16 -> layer.00.mlp.down_proj.output.bf16   0.125000   0.002306   0.015625   0.004846   0.999996 False  False  ok
+layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16   0.250000   0.002617   0.031250   0.007614   0.999994 False  False  ok
+summary:
+  compared=13
+  alerts=0
+  first_alert=none
+  worst_mean_abs=layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16:0.002617
+  worst_cosine=layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16:0.999993920
