@@ -5,8 +5,12 @@
 //! behind this boundary in later slices so stale fixture assumptions cannot leak
 //! into the model implementation.
 
+pub mod codebook_embedding;
+pub mod codec_input;
 pub mod compare;
 pub mod config;
+pub mod decode_session;
+pub mod delay_pattern;
 pub mod kernel_plan;
 pub mod layer_dump;
 pub mod load_plan;

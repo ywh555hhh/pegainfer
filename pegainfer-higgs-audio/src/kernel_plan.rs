@@ -65,6 +65,46 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
             ],
         },
         KernelPhase {
+            name: "decode",
+            ops: &[
+                KernelOp {
+                    id: "delay_pattern_state",
+                    rust: "delay_pattern::DelayPatternState::step_from_sampled_codes",
+                    backend: "CPU logic",
+                    notes: "applies Higgs multi-codebook ramp-up BOC masking, cb0 EOC wind-down, done state, and delayed-row retention",
+                },
+                KernelOp {
+                    id: "fused_codebook_feedback_embedding",
+                    rust: "codebook_embedding::fused_codebook_embedding_cpu",
+                    backend: "CPU logic",
+                    notes: "sums per-codebook rows from tied.embedding.modality_embeddings.0.embedding.weight using codebook-local ids plus codebook offsets",
+                },
+                KernelOp {
+                    id: "decode_session_collect",
+                    rust: "decode_session::HiggsDecodeSession::step_from_sampled_codes",
+                    backend: "CPU logic",
+                    notes: "collects emitted delayed rows, exposes last feedback codes, and de-delays the accumulated code matrix for codec input",
+                },
+            ],
+        },
+        KernelPhase {
+            name: "vocoder",
+            ops: &[
+                KernelOp {
+                    id: "codec_input_prepare",
+                    rust: "codec_input::codec_input_from_rows",
+                    backend: "CPU logic",
+                    notes: "de-delays generated Higgs rows and clamps BOC/EOC codec sentinels before vocoder decode",
+                },
+                KernelOp {
+                    id: "python_codec_sidecar",
+                    rust: "bin::higgs_vocode_codes -> tools/higgs/vocode_higgs_codes.py",
+                    backend: "Python sidecar",
+                    notes: "temporary route through Higgs-owned local codec wrapper to produce 24 kHz wav while Rust-native codec decode is scoped",
+                },
+            ],
+        },
+        KernelPhase {
             name: "golden",
             ops: &[
                 KernelOp {
@@ -78,6 +118,18 @@ pub static KERNEL_PLAN: KernelPlan = KernelPlan {
                     rust: "compare::compare_one_step_semantic_files",
                     backend: "CPU",
                     notes: "runtime bring-up gate using prompt exactness, argmax exactness, cosine, regret, and top-64 overlap",
+                },
+                KernelOp {
+                    id: "reference_audio_e2e_gate",
+                    rust: "tools/higgs/run_higgs_audio_e2e_gate.sh -> tools/higgs/request_higgs_audio.py",
+                    backend: "SGLang-Omni HTTP reference + CPU wav validation",
+                    notes: "requests /v1/audio/speech, persists a real 24 kHz wav artifact, and optionally replays captured Higgs code rows through the codec sidecar",
+                },
+                KernelOp {
+                    id: "slow_fullprefill_reference_e2e",
+                    rust: "tools/higgs/slow_higgs_fullprefill_e2e.py",
+                    backend: "Transformers Qwen3 full-prefill reference + Python codec sidecar",
+                    notes: "non-production bring-up path that composes text prompt embeddings, generated audio-code feedback embeddings, delayed-code reversal, and local codec decode into a real wav without touching runtime crates",
                 },
             ],
         },
@@ -99,7 +151,10 @@ mod tests {
             .iter()
             .map(|phase| phase.name)
             .collect();
-        assert_eq!(phase_names, ["artifact", "prefill", "golden"]);
+        assert_eq!(
+            phase_names,
+            ["artifact", "prefill", "decode", "vocoder", "golden"]
+        );
     }
 
     #[test]
@@ -121,10 +176,45 @@ mod tests {
             ops.iter()
                 .any(|op| op.id == "fused_audio_head" && op.backend == "CUDA bf16 linear")
         );
+        assert!(ops.iter().any(|op| {
+            op.id == "delay_pattern_state"
+                && op.backend == "CPU logic"
+                && op.notes.contains("cb0 EOC wind-down")
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "fused_codebook_feedback_embedding"
+                && op.backend == "CPU logic"
+                && op.notes.contains("codebook offsets")
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "decode_session_collect"
+                && op.backend == "CPU logic"
+                && op.notes.contains("de-delays")
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "codec_input_prepare"
+                && op.backend == "CPU logic"
+                && op.notes.contains("clamps")
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "python_codec_sidecar"
+                && op.backend == "Python sidecar"
+                && op.notes.contains("24 kHz wav")
+        }));
         assert!(
             ops.iter()
                 .any(|op| op.id == "semantic_comparison" && op.backend == "CPU")
         );
+        assert!(ops.iter().any(|op| {
+            op.id == "reference_audio_e2e_gate"
+                && op.backend == "SGLang-Omni HTTP reference + CPU wav validation"
+                && op.notes.contains("real 24 kHz wav")
+        }));
+        assert!(ops.iter().any(|op| {
+            op.id == "slow_fullprefill_reference_e2e"
+                && op.backend == "Transformers Qwen3 full-prefill reference + Python codec sidecar"
+                && op.notes.contains("without touching runtime crates")
+        }));
     }
 
     #[test]

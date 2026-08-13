@@ -34,7 +34,10 @@ python3 -m py_compile \
   "$repo_root/tools/higgs/check_higgs_gate_summary.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_imports.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summary.py" \
-  "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py"
+  "$repo_root/tools/higgs/check_higgs_sglang_omni_source_gate_summary.py" \
+  "$repo_root/tools/higgs/request_higgs_audio.py" \
+  "$repo_root/tools/higgs/slow_higgs_fullprefill_e2e.py" \
+  "$repo_root/tools/higgs/vocode_higgs_codes.py"
 
 summary_tmp="$tmp_root/summary-checks"
 mkdir -p "$summary_tmp/auto-view"
