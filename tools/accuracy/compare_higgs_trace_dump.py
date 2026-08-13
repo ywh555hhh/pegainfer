@@ -22,21 +22,66 @@ PROMPT_TENSORS = (
     "prompt.attention_mask",
     "prompt.lengths",
 )
-LAYER0_STAGE_ALIASES = {
-    "layer0.input_hidden.bf16": "embedding.sequence_hidden.bf16",
-    "layer0.input_norm.bf16": "layer.00.input_layernorm.output.bf16",
-    "layer0.q_proj.bf16": "layer.00.self_attn.q_proj.output.bf16",
-    "layer0.k_proj.bf16": "layer.00.self_attn.k_proj.output.bf16",
-    "layer0.v_proj.bf16": "layer.00.self_attn.v_proj.output.bf16",
-    "layer0.q_norm.bf16": "layer.00.self_attn.q_norm.output.bf16",
-    "layer0.k_norm.bf16": "layer.00.self_attn.k_norm.output.bf16",
-    "layer0.o_proj.bf16": "layer.00.self_attn.o_proj.output.bf16",
-    "layer0.post_attn_norm.bf16": "layer.00.post_attention_layernorm.output.bf16",
-    "layer0.gate_proj.bf16": "layer.00.mlp.gate_proj.output.bf16",
-    "layer0.up_proj.bf16": "layer.00.mlp.up_proj.output.bf16",
-    "layer0.down_proj.bf16": "layer.00.mlp.down_proj.output.bf16",
-    "layer0.output_hidden.bf16": "layer.00.sequence_hidden.bf16",
+STAGE_SUFFIX_ALIASES = {
+    "input_norm": "input_layernorm.output",
+    "q_proj": "self_attn.q_proj.output",
+    "k_proj": "self_attn.k_proj.output",
+    "v_proj": "self_attn.v_proj.output",
+    "q_norm": "self_attn.q_norm.output",
+    "k_norm": "self_attn.k_norm.output",
+    "o_proj": "self_attn.o_proj.output",
+    "post_attn_norm": "post_attention_layernorm.output",
+    "gate_proj": "mlp.gate_proj.output",
+    "up_proj": "mlp.up_proj.output",
+    "down_proj": "mlp.down_proj.output",
 }
+
+
+
+STAGE_EXECUTION_ORDER = {
+    "input_hidden": 0,
+    "input_norm": 1,
+    "q_proj": 2,
+    "k_proj": 3,
+    "v_proj": 4,
+    "q_norm": 5,
+    "k_norm": 6,
+    "q_norm_rope": 7,
+    "k_norm_rope": 8,
+    "attn_output": 9,
+    "o_proj": 10,
+    "post_attn_norm": 11,
+    "gate_proj": 12,
+    "up_proj": 13,
+    "silu_mul": 14,
+    "down_proj": 15,
+    "output_hidden": 16,
+}
+
+
+def stage_actual_order(name: str) -> tuple[int, int, str]:
+    match = re.fullmatch(r"layer(\d+)\.([A-Za-z0-9_]+)\.bf16", name)
+    if match is None:
+        return (10_000, 10_000, name)
+    return (int(match.group(1)), STAGE_EXECUTION_ORDER.get(match.group(2), 9_999), name)
+
+def stage_actual_to_trace_name(actual_name: str) -> str | None:
+    match = re.fullmatch(r"layer(\d+)\.([A-Za-z0-9_]+)\.bf16", actual_name)
+    if match is None:
+        return None
+    layer_idx = int(match.group(1))
+    suffix = match.group(2)
+    if suffix == "input_hidden":
+        if layer_idx == 0:
+            return "embedding.sequence_hidden.bf16"
+        return f"layer.{layer_idx - 1:02}.sequence_hidden.bf16"
+    if suffix == "output_hidden":
+        return f"layer.{layer_idx:02}.sequence_hidden.bf16"
+    trace_suffix = STAGE_SUFFIX_ALIASES.get(suffix)
+    if trace_suffix is None:
+        return None
+    return f"layer.{layer_idx:02}.{trace_suffix}.bf16"
+
 
 
 @dataclass
@@ -238,25 +283,48 @@ def select_items(
     if alias_set == "none":
         common, missing_from_actual, extra_actual = select_names(golden, actual, include_regex)
         return [CompareItem(name, name, name) for name in common], missing_from_actual, extra_actual
-    if alias_set != "layer0-stage":
+    if alias_set not in {"layer0-stage", "layer-stage"}:
         raise ValueError(f"unknown alias set: {alias_set}")
 
     pattern = re.compile(include_regex) if include_regex else None
     items = []
-    missing_from_actual = []
     missing_from_golden = []
-    for actual_name, golden_name in LAYER0_STAGE_ALIASES.items():
+    seen_golden = set()
+    actual_names = sorted(actual, key=stage_actual_order)
+    for actual_name in actual_names:
+        golden_name = stage_actual_to_trace_name(actual_name)
+        if golden_name is None:
+            continue
+        if alias_set == "layer0-stage" and not actual_name.startswith("layer0."):
+            continue
         display_name = f"{actual_name} -> {golden_name}"
         if pattern is not None and not (pattern.search(actual_name) or pattern.search(golden_name)):
-            continue
-        if actual_name not in actual:
-            missing_from_actual.append(actual_name)
             continue
         if golden_name not in golden:
             missing_from_golden.append(golden_name)
             continue
+        seen_golden.add(golden_name)
         items.append(CompareItem(display_name, golden_name, actual_name))
-    return items, missing_from_actual, missing_from_golden
+    missing_from_actual = []
+    if alias_set == "layer0-stage":
+        for actual_name in (
+            "layer0.input_hidden.bf16",
+            "layer0.input_norm.bf16",
+            "layer0.q_proj.bf16",
+            "layer0.k_proj.bf16",
+            "layer0.v_proj.bf16",
+            "layer0.q_norm.bf16",
+            "layer0.k_norm.bf16",
+            "layer0.o_proj.bf16",
+            "layer0.post_attn_norm.bf16",
+            "layer0.gate_proj.bf16",
+            "layer0.up_proj.bf16",
+            "layer0.down_proj.bf16",
+            "layer0.output_hidden.bf16",
+        ):
+            if actual_name not in actual:
+                missing_from_actual.append(actual_name)
+    return items, missing_from_actual, sorted(set(missing_from_golden), key=trace_order)
 
 
 def format_float(value: float | None) -> str:
@@ -280,7 +348,7 @@ def main() -> None:
     parser.add_argument("--include-regex", default="")
     parser.add_argument(
         "--alias-set",
-        choices=("none", "layer0-stage"),
+        choices=("none", "layer0-stage", "layer-stage"),
         default="none",
         help="Optional built-in mapping from a partial actual dump schema to the trace golden schema.",
     )

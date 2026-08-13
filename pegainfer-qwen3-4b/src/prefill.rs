@@ -33,7 +33,7 @@ pub(super) struct PrefillBuffers {
 }
 
 pub(super) struct PrefillStageSnapshot {
-    pub(super) name: &'static str,
+    pub(super) name: String,
     pub(super) values: DeviceVec,
 }
 
@@ -494,18 +494,27 @@ impl Qwen3Model {
         Ok((embedding_snapshot, layer_snapshots, final_normed))
     }
 
-    /// Run just layer 0 and return stage-level last-token snapshots.
+    /// Run one selected prefill layer and return stage-level last-token snapshots.
     ///
     /// This diagnostic narrows hidden drift after the embedding boundary without
-    /// changing the production layer forward path.
-    pub(crate) fn prefill_layer0_stage_snapshots(
+    /// changing the production layer forward path. Layers before `layer_idx` are
+    /// executed normally to produce the real input hidden/KV state for the target
+    /// layer.
+    pub(crate) fn prefill_layer_stage_snapshots(
         &self,
+        layer_idx: usize,
         prompt: &[u32],
         kv_view: &KvView,
         kv_buffer: &CudaSlice<bf16>,
         layout: &KvLayout,
     ) -> Result<Vec<PrefillStageSnapshot>> {
         anyhow::ensure!(!prompt.is_empty(), "prompt must not be empty");
+        anyhow::ensure!(
+            layer_idx < self.layers.len(),
+            "layer_idx {} out of range for {} layers",
+            layer_idx,
+            self.layers.len()
+        );
 
         let mut hidden = self.get_embeddings_batch(prompt)?;
         let start_position = kv_view.seq_len() - prompt.len();
@@ -527,12 +536,6 @@ impl Qwen3Model {
         let kv_dim = self.local_kv_dim();
         let last_token_idx = prompt.len() - 1;
         let mut stages = Vec::new();
-        let layer_idx = 0usize;
-        let layer = &self.layers[layer_idx];
-        let num_heads = self.local_num_attention_heads();
-        let num_kv_heads = self.local_num_key_value_heads();
-        let head_dim = self.config.head_dim;
-
         let mut bufs = PrefillBuffers::new(
             &self.ctx,
             self.config.hidden_size,
@@ -542,8 +545,26 @@ impl Qwen3Model {
             total_tokens,
         )?;
 
+        for (previous_idx, previous_layer) in self.layers.iter().take(layer_idx).enumerate() {
+            self.forward_layer_batch_paged(
+                previous_idx,
+                previous_layer,
+                &mut hidden,
+                kv_buffer,
+                layout,
+                &plan,
+                &mut bufs,
+            )?;
+        }
+
+        let layer = &self.layers[layer_idx];
+        let stage_prefix = format!("layer{layer_idx}");
+        let num_heads = self.local_num_attention_heads();
+        let num_kv_heads = self.local_num_key_value_heads();
+        let head_dim = self.config.head_dim;
+
         stages.push(PrefillStageSnapshot {
-            name: "layer0.input_hidden.bf16",
+            name: format!("{stage_prefix}.input_hidden.bf16"),
             values: ops::extract_vec(&self.ctx, &hidden, last_token_idx)?,
         });
 
@@ -556,7 +577,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.input_norm.bf16",
+            format!("{stage_prefix}.input_norm.bf16"),
             &self.ctx,
             &bufs.normed,
             last_token_idx,
@@ -572,7 +593,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.q_proj.bf16",
+            format!("{stage_prefix}.q_proj.bf16"),
             &self.ctx,
             &bufs.q_batch,
             last_token_idx,
@@ -588,7 +609,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.k_proj.bf16",
+            format!("{stage_prefix}.k_proj.bf16"),
             &self.ctx,
             &bufs.k_batch,
             last_token_idx,
@@ -604,7 +625,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.v_proj.bf16",
+            format!("{stage_prefix}.v_proj.bf16"),
             &self.ctx,
             &bufs.v_batch,
             last_token_idx,
@@ -650,14 +671,14 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.q_norm.bf16",
+            format!("{stage_prefix}.q_norm.bf16"),
             &self.ctx,
             &q_norm_debug,
             last_token_idx,
         )?;
         push_stage(
             &mut stages,
-            "layer0.k_norm.bf16",
+            format!("{stage_prefix}.k_norm.bf16"),
             &self.ctx,
             &k_norm_debug,
             last_token_idx,
@@ -684,21 +705,21 @@ impl Qwen3Model {
         )?;
         push_stage(
             &mut stages,
-            "layer0.q_norm_rope.bf16",
+            format!("{stage_prefix}.q_norm_rope.bf16"),
             &self.ctx,
             &bufs.q_batch,
             last_token_idx,
         )?;
         push_stage(
             &mut stages,
-            "layer0.k_norm_rope.bf16",
+            format!("{stage_prefix}.k_norm_rope.bf16"),
             &self.ctx,
             &bufs.k_batch,
             last_token_idx,
         )?;
         push_stage(
             &mut stages,
-            "layer0.attn_output.bf16",
+            format!("{stage_prefix}.attn_output.bf16"),
             &self.ctx,
             &bufs.attn_output,
             last_token_idx,
@@ -713,7 +734,7 @@ impl Qwen3Model {
         self.all_reduce_hidden(&mut bufs.o_buf)?;
         push_stage(
             &mut stages,
-            "layer0.o_proj.bf16",
+            format!("{stage_prefix}.o_proj.bf16"),
             &self.ctx,
             &bufs.o_buf,
             last_token_idx,
@@ -729,7 +750,7 @@ impl Qwen3Model {
         )?;
         push_stage(
             &mut stages,
-            "layer0.post_attn_norm.bf16",
+            format!("{stage_prefix}.post_attn_norm.bf16"),
             &self.ctx,
             &bufs.normed,
             last_token_idx,
@@ -745,7 +766,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.gate_proj.bf16",
+            format!("{stage_prefix}.gate_proj.bf16"),
             &self.ctx,
             &bufs.gate_out,
             last_token_idx,
@@ -761,7 +782,7 @@ impl Qwen3Model {
         );
         push_stage(
             &mut stages,
-            "layer0.up_proj.bf16",
+            format!("{stage_prefix}.up_proj.bf16"),
             &self.ctx,
             &bufs.up_out,
             last_token_idx,
@@ -770,7 +791,7 @@ impl Qwen3Model {
         ops::silu_mul_batch_into(&self.ctx, &bufs.gate_out, &bufs.up_out, &mut bufs.act_out)?;
         push_stage(
             &mut stages,
-            "layer0.silu_mul.bf16",
+            format!("{stage_prefix}.silu_mul.bf16"),
             &self.ctx,
             &bufs.act_out,
             last_token_idx,
@@ -785,7 +806,7 @@ impl Qwen3Model {
         self.all_reduce_hidden(&mut bufs.o_buf)?;
         push_stage(
             &mut stages,
-            "layer0.down_proj.bf16",
+            format!("{stage_prefix}.down_proj.bf16"),
             &self.ctx,
             &bufs.o_buf,
             last_token_idx,
@@ -795,7 +816,7 @@ impl Qwen3Model {
         std::mem::swap(&mut hidden, &mut bufs.hidden_out);
         push_stage(
             &mut stages,
-            "layer0.output_hidden.bf16",
+            format!("{stage_prefix}.output_hidden.bf16"),
             &self.ctx,
             &hidden,
             last_token_idx,
@@ -843,7 +864,7 @@ impl Qwen3Model {
 
 fn push_stage(
     stages: &mut Vec<PrefillStageSnapshot>,
-    name: &'static str,
+    name: String,
     ctx: &DeviceContext,
     batch: &HiddenStates,
     token_idx: usize,

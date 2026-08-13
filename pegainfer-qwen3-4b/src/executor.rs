@@ -238,8 +238,12 @@ fn execute_step_on_lane(
                 Ok(WorkerStepOutcome::Ack)
             }
         }
-        StepCommand::PrefillLayer0Stages { prompt, kv_view } => {
-            let stages = lane.execute_prefill_layer0_stages(prompt, kv_view)?;
+        StepCommand::PrefillLayerStages {
+            layer_idx,
+            prompt,
+            kv_view,
+        } => {
+            let stages = lane.execute_prefill_layer_stages(*layer_idx, prompt, kv_view)?;
             if collect_result {
                 Ok(WorkerStepOutcome::PrefillStages(stages))
             } else {
@@ -803,8 +807,9 @@ impl Qwen3Executor {
         }
     }
 
-    pub fn prefill_layer0_stages_bf16(
+    pub fn prefill_layer_stages_bf16(
         &mut self,
+        layer_idx: usize,
         prompt_tokens: Vec<u32>,
     ) -> Result<PrefillStageResult> {
         anyhow::ensure!(!prompt_tokens.is_empty(), "prompt must not be empty");
@@ -815,10 +820,11 @@ impl Qwen3Executor {
         );
         rkv.schedule_prefill(prompt_tokens.len(), &self.kv_mgr)
             .map_err(|e| {
-                anyhow::anyhow!("schedule_prefill failed for diagnostic layer0 stage dump: {e}")
+                anyhow::anyhow!("schedule_prefill failed for diagnostic layer stage dump: {e}")
             })?;
         let kv_view = rkv.prefill_view(prompt_tokens.len());
-        let step = StepCommand::PrefillLayer0Stages {
+        let step = StepCommand::PrefillLayerStages {
+            layer_idx,
             prompt: prompt_tokens,
             kv_view,
         };
@@ -826,10 +832,17 @@ impl Qwen3Executor {
         match outcome {
             WorkerStepOutcome::PrefillStages(result) => Ok(result),
             other => Err(anyhow::anyhow!(
-                "prefill layer0 stages returned unexpected: {}",
+                "prefill layer stages returned unexpected: {}",
                 other.kind()
             )),
         }
+    }
+
+    pub fn prefill_layer0_stages_bf16(
+        &mut self,
+        prompt_tokens: Vec<u32>,
+    ) -> Result<PrefillStageResult> {
+        self.prefill_layer_stages_bf16(0, prompt_tokens)
     }
 
     pub fn activate_lora_adapter(&mut self, adapter: Option<&str>) -> Result<()> {
@@ -1449,12 +1462,14 @@ impl LocalQwen3Lane {
         })
     }
 
-    fn execute_prefill_layer0_stages(
+    fn execute_prefill_layer_stages(
         &mut self,
+        layer_idx: usize,
         prompt: &[u32],
         kv_view: &KvView,
     ) -> Result<PrefillStageResult> {
-        let stages = self.model.prefill_layer0_stage_snapshots(
+        let stages = self.model.prefill_layer_stage_snapshots(
+            layer_idx,
             prompt,
             kv_view,
             self.kv_buffer.buffer(),
@@ -1549,7 +1564,8 @@ enum StepCommand {
         prompt: Vec<u32>,
         kv_view: KvView,
     },
-    PrefillLayer0Stages {
+    PrefillLayerStages {
+        layer_idx: usize,
         prompt: Vec<u32>,
         kv_view: KvView,
     },
@@ -1563,7 +1579,7 @@ impl StepCommand {
             Self::Unified { .. } => "unified",
             Self::PrefillLastHidden { .. } => "prefill_hidden",
             Self::PrefillLayerHidden { .. } => "prefill_layer_hidden",
-            Self::PrefillLayer0Stages { .. } => "prefill_layer0_stages",
+            Self::PrefillLayerStages { .. } => "prefill_layer_stages",
         }
     }
 }
@@ -1610,7 +1626,7 @@ impl WorkerStepOutcome {
             Self::Unified(_) => "unified",
             Self::PrefillHidden(_) => "prefill_hidden",
             Self::PrefillLayerHidden(_) => "prefill_layer_hidden",
-            Self::PrefillStages(_) => "prefill_layer0_stages",
+            Self::PrefillStages(_) => "prefill_layer_stages",
         }
     }
 }

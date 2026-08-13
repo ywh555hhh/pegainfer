@@ -19,6 +19,8 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `prefill-layer-hidden-vs-trace-old4090-ef7b8d4.{txt,json}`: per-layer hidden actual vs AutoDL trace golden comparison.
 - `higgs-layer0-stages-old4090-13651bf.safetensors`: PegaInfer layer0 stage actual dump.
 - `layer0-stages-vs-trace-old4090-13651bf.{txt,json}`: layer0 stage actual vs AutoDL trace golden comparison using `--alias-set layer0-stage`.
+- `higgs-layer1-stages-old4090-dev.safetensors`: PegaInfer layer1 stage actual dump generated with generalized `--layer-idx 1` support.
+- `layer1-stages-vs-trace-old4090-dev-v2.{txt,json}`: layer1 stage actual vs AutoDL trace golden comparison using execution-ordered `--alias-set layer-stage`.
 
 ## Results
 
@@ -39,6 +41,11 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - alerts: `0`
   - first alert: `none`
   - worst mean abs: `layer0.output_hidden.bf16 -> layer.00.sequence_hidden.bf16:0.002617`
+- Layer1 stage vs trace golden compared 13 mapped stage tensors:
+  - input hidden, input norm, q/k/v projections are within thresholds
+  - first execution-order alert: `layer1.q_norm.bf16 -> layer.01.self_attn.q_norm.output.bf16`
+  - additional alerts: `k_norm`, `gate_proj`, `up_proj`, `output_hidden`
+  - worst mean abs: `layer1.gate_proj.bf16 -> layer.01.mlp.gate_proj.output.bf16:0.008645`
 
 ## Interpretation
 
@@ -48,17 +55,21 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 2. The prompt and embedding path are exact.
 3. Layer0 substage outputs match the AutoDL SGLang-Omni source-reference trace within the current thresholds.
 4. The first layer-level drift worth investigating is `layer.01.last_hidden.bf16`.
+5. Layer1 substage comparison narrows the first execution-order drift to q/k RMSNorm (`layer1.q_norm.bf16`, then `layer1.k_norm.bf16`), after input hidden and q/k/v projections remain within thresholds.
 
-Next development target: add or reuse a layer1 stage dump and compare it against the trace golden. Do not hack around drift by injecting trace tensors or hardcoding outputs; the trace is only an oracle for locating the first semantic/numeric divergence.
+Next development target: inspect q/k RMSNorm shape/layout/epsilon/rounding for layer1, then extend the trace reference to include rope and attention-output internals if q/k norm alone does not explain the downstream drift. Do not hack around drift by injecting trace tensors or hardcoding outputs; the trace is only an oracle for locating the first semantic/numeric divergence.
 
 ## SHA256
 
 ```text
 6efc49efa59d400e880ab511482ebf86770309da2723a2e178333863977e494d  higgs-layer0-stages-old4090-13651bf.safetensors
+7a9f6380c695373fd896af59564a2c7aaeebbc9eb6b26744d916e8ef6f1b8b7c  higgs-layer1-stages-old4090-dev.safetensors
 b42337ad855e0ed055f5c7e40af68fe016c40e1f60335bfbdf2e8d743e4ab569  higgs-one-step-cuda-gate-old4090-trace-driven-ef7b8d4.txt
 6066ba530c6a3e7dce6c31e7514e7f6cb673a3a2e22fed9ea4906fc3e7936790  higgs-prefill-layer-hidden-old4090-ef7b8d4.safetensors
 d6932c51429641c2970ffe3fdc3699d3708bb86fce3e811599486b197f152c4e  layer0-stages-vs-trace-old4090-13651bf.json
 b860082458890a3b7c6baec04d51ff2f0f193dd0041f88a9491d4f33ca505cb3  layer0-stages-vs-trace-old4090-13651bf.txt
+fc19d6cdf6b5f77f45fea35d2c7f82027ac18416b91e6827228ed748648448f1  layer1-stages-vs-trace-old4090-dev-v2.json
+c26fc5f889c1ac0ef9f72454fb0ad4dc14112d117da0a588955a0591f5461e89  layer1-stages-vs-trace-old4090-dev-v2.txt
 f9a64a5a2961e98036681f70f508c801f760586adf664506122cef1e742d4ff3  one-step-actual-vs-trace-old4090-ef7b8d4.json
 6647b9e4154961c200f18810608a99fbc28aa64277364cd34429a906ea0837a0  one-step-actual-vs-trace-old4090-ef7b8d4.txt
 a3639507ad3a91b8184eea1684f81470374d5f050c3ab6087c96642d3a849cae  prefill-layer-hidden-vs-trace-old4090-ef7b8d4.json

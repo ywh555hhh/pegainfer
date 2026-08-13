@@ -1,0 +1,24 @@
+prompt_exact=True
+common_tensors=13
+missing_from_actual=0
+extra_actual=0
+name                                                       max_abs   mean_abs    p99_abs       rmse      cosine  exact  alert  reason
+layer1.input_hidden.bf16 -> layer.00.sequence_hidden.bf16    0.250000   0.002617   0.031250   0.007614   0.999994 False  False  ok
+layer1.input_norm.bf16 -> layer.01.input_layernorm.output.bf16   0.001465   0.000068   0.000488   0.000119   0.999981 False  False  ok
+layer1.q_proj.bf16 -> layer.01.self_attn.q_proj.output.bf16   0.007812   0.000531   0.003906   0.000945   0.999996 False  False  ok
+layer1.k_proj.bf16 -> layer.01.self_attn.k_proj.output.bf16   0.007812   0.000737   0.003906   0.001258   0.999994 False  False  ok
+layer1.v_proj.bf16 -> layer.01.self_attn.v_proj.output.bf16   0.001953   0.000336   0.001221   0.000463   0.999980 False  False  ok
+layer1.q_norm.bf16 -> layer.01.self_attn.q_norm.output.bf16   0.062500   0.003324   0.031250   0.006419   0.999992 False   True  mean_abs>0.003
+layer1.k_norm.bf16 -> layer.01.self_attn.k_norm.output.bf16   0.250000   0.004567   0.031250   0.011958   0.999992 False   True  mean_abs>0.003
+layer1.o_proj.bf16 -> layer.01.self_attn.o_proj.output.bf16   0.031250   0.001962   0.007812   0.003171   0.999999 False  False  ok
+layer1.post_attn_norm.bf16 -> layer.01.post_attention_layernorm.output.bf16   0.062500   0.001059   0.007812   0.003060   0.999980 False  False  ok
+layer1.gate_proj.bf16 -> layer.01.mlp.gate_proj.output.bf16   0.062500   0.008645   0.062500   0.022483   1.000006 False   True  mean_abs>0.003
+layer1.up_proj.bf16 -> layer.01.mlp.up_proj.output.bf16      0.250000   0.005325   0.031250   0.011052   0.999996 False   True  mean_abs>0.003
+layer1.down_proj.bf16 -> layer.01.mlp.down_proj.output.bf16   0.500000   0.002628   0.015625   0.011051   0.999996 False  False  ok
+layer1.output_hidden.bf16 -> layer.01.sequence_hidden.bf16   1.000000   0.004883   0.031250   0.021483   0.999993 False   True  mean_abs>0.003
+summary:
+  compared=13
+  alerts=5
+  first_alert=layer1.q_norm.bf16 -> layer.01.self_attn.q_norm.output.bf16
+  worst_mean_abs=layer1.gate_proj.bf16 -> layer.01.mlp.gate_proj.output.bf16:0.008645
+  worst_cosine=layer1.v_proj.bf16 -> layer.01.self_attn.v_proj.output.bf16:0.999979556
