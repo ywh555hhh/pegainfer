@@ -277,8 +277,16 @@ def add_hidden_state_trace(
 ) -> None:
     if hidden_states is None:
         return
+    # Transformers Qwen3 returns output_hidden_states as:
+    #   embedding, layer0_output, ..., layer34_output, final_norm_output
+    # The raw layer35 decoder output is not present in this tuple because the
+    # final item is appended after model.norm. Store that tensor as final_hidden
+    # only; labeling it layer.35.* creates a false last-layer divergence.
+    last_idx = len(hidden_states) - 1
     cpu_lens = prompt_lens.cpu()
     for idx, state in enumerate(hidden_states):
+        if idx == last_idx:
+            continue
         if idx == 0:
             sequence_name = "embedding.sequence_hidden.bf16"
             last_name = "embedding.last_hidden.bf16"
@@ -320,8 +328,8 @@ def write_trace_file(
     trace_metadata.update(
         {
             "fixture_kind": "higgs-one-step-trace-golden",
-            "schema_version": "2",
-            "trace_contract": "prompt;embedding;per-layer hidden;per-layer module outputs;qkv/mlp stage hooks;audio-head logits/logprobs/topk/argmax",
+            "schema_version": "3",
+            "trace_contract": "prompt;embedding;per-layer hidden except final decoder raw hidden;per-layer module outputs;qkv/mlp stage hooks;audio-head logits/logprobs/topk/argmax",
             "trace_tensor_count": str(len(tensors)),
             "trace_module_suffixes": ";".join(TRACE_MODULE_SUFFIXES),
         }

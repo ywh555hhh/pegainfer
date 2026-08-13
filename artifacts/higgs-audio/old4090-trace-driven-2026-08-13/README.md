@@ -30,6 +30,9 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `layer1-residual-drift-old4090-hfround.{txt,json}`: residual/fused-add-RMSNorm diagnostic after the change, proving actual post-attention norm now matches the HF-like branch exactly.
 - `one-step-actual-vs-trace-old4090-hfround.{txt,json}` and `prefill-layer-hidden-vs-trace-old4090-hfround.{txt,json}`: end-to-end and layer-hidden comparisons after the change.
 - `higgs-one-step-cuda-gate-old4090-hfround.txt`: one-step CUDA gate after the change; semantic and session semantic gates remain green.
+- `higgs-layer{32,33,34,35}-stages-hf-old4090-hfround.safetensors` and `higgs-layer{32,33,34,35}-stages-old4090-hfround.safetensors`: late-layer full-stage HF/SGLang-source goldens and PegaInfer actual dumps after the HF-like fused-add-RMSNorm change.
+- `layer{32,33,34,35}-full-stages-vs-hf-old4090-hfround.{txt,json}`: late-layer full-stage comparisons used to separate real late-layer amplification from a stale rich-trace hidden-state alias.
+- `prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.{txt,json}`: per-layer hidden comparison against the AutoDL rich trace after excluding the known bad `layer.35.{sequence,last}_hidden` aliases from schema v2.
 
 ## Results
 
@@ -73,6 +76,11 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - layer0 output hidden improves from `mean_abs=0.002617` to `0.001837`
   - layer1 `post_attn_norm` improves from `0.001059` to `0.000648`, `gate_proj` from `0.008645` to `0.005716`, and `output_hidden` from `0.004883` to `0.003201`
   - one-step trace comparison improves: `final_hidden.mean_abs 0.007636 -> 0.006403`, `audio_logits.mean_abs 0.115132 -> 0.043190`, `audio_top64.logprobs.mean_abs 0.309766 -> 0.044132`, with `audio_argmax.ids` still exact
+- Late-layer trace alignment:
+  - fresh full-stage HF/SGLang-source goldens show PegaInfer late layers remain high-cosine: layer32/33/34/35 output-hidden cosine is `0.999994576`, `0.999994576`, `0.999990582`, and `0.999991179`
+  - late-layer output-hidden mean drift grows gradually rather than jumping: layer32 `0.197028`, layer33 `0.249898`, layer34 `0.546417`, layer35 `1.036249`
+  - three-way comparison showed the old AutoDL rich trace's `layer.35.last_hidden.bf16` is effectively the final normed hidden, not the raw layer35 decoder output: fresh HF stage vs AutoDL trace at layer35 has `mean_abs=174.776855`, while PegaInfer actual vs fresh HF stage is only `1.036249`
+  - after excluding the bad final-layer hidden alias, per-layer hidden vs trace compares 40 tensors; the worst hidden drift is `layer.34.last_hidden.bf16:0.589288`, and `final_hidden.bf16` remains close (`mean_abs=0.006403`, cosine `0.999991894`)
 
 ## Interpretation
 
@@ -88,8 +96,9 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 8. Projection recompute diagnostics rule out a projection weight-layout/GEMM call-site mismatch: the same checkpoint weights reproduce PegaInfer actual projection outputs from PegaInfer actual inputs with tiny residuals.
 9. Residual/fused-add-RMSNorm diagnostics found and fixed a real Qwen3/HF semantic mismatch: PegaInfer had been preserving the BF16 residual-add boundary but not the HF RMSNorm mid-round-before-weight boundary.
 10. The fix is partial but real: it improves layer0/layer1 stage parity and end-to-end trace metrics while keeping one-step semantic and session semantic gates green.
+11. The previous `layer.35.last_hidden` giant drift was not a valid raw-layer oracle. The old rich trace schema labeled the final normed hidden as `layer.35.last_hidden`; future trace generation now skips that alias and stores the final normed hidden only as `final_hidden.bf16`.
 
-Next development target: continue from the new first alert (`layer1.k_norm.bf16`, just above the `0.003` mean threshold) and investigate later-layer raw hidden amplification, especially why `layer.35.last_hidden` diverges heavily before final norm while final hidden/logits remain high-cosine and argmax-exact. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
+Next development target: continue from the new first alert (`layer1.k_norm.bf16`, just above the `0.003` mean threshold) and investigate why small early-layer BF16 drift is gradually amplified through late MLP/residual stages while final norm/logits remain high-cosine and argmax-exact. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -131,4 +140,22 @@ ee37a7c16d21d8435fc23f6bced17fb7028f594810933c45fe39f2202d3852c3  layer1-residua
 208c244c2581884475c1f5af5f25fc1ea953df92d98553b7d02d1c57d03dc690  one-step-actual-vs-trace-old4090-hfround.txt
 c64c4c1fa89cfcfb9310db76182f058aa989a199a128e6e4bef0614d9fbe2af9  prefill-layer-hidden-vs-trace-old4090-hfround.json
 b5da888db80cc61ec626c42fa2b2b6004ae3f5b16bb9455d973969d2af7fa338  prefill-layer-hidden-vs-trace-old4090-hfround.txt
+3ea92a9ddc31a2919500959c686e6c96442bdb27eeae23a8dbb8e6083520b4c2  higgs-layer32-stages-hf-old4090-hfround.safetensors
+ea81cdee5981b5eae0d0139d0489147c0e48760c4ea500d703cf5c7eff486730  higgs-layer32-stages-old4090-hfround.safetensors
+a4dc69eddbdb8c013208abf69a2ba7a75ef4e76f9d9feec28ccfd8e3b7df1b27  higgs-layer33-stages-hf-old4090-hfround.safetensors
+e8d064989e649f16ac24baf3b01440ae068139f3c9942f9cf843fb25db93dce4  higgs-layer33-stages-old4090-hfround.safetensors
+accb95a4f1e0f41faef1668303de89fa2a8f4fc509b024425b81f526ab43d46c  higgs-layer34-stages-hf-old4090-hfround.safetensors
+e211c816ea9f1997e549647121436d6270e0da9fc993f28ca7b070fab75a57c7  higgs-layer34-stages-old4090-hfround.safetensors
+da49a5b4bcf8d82f0c3c26bf3f845ddb195d8f04de495f074919a0702be7807d  higgs-layer35-stages-hf-old4090-hfround.safetensors
+37dfd70384edd6346bc62ac06bddc5344d48182b2eb4eb2c36d5536da72b6517  higgs-layer35-stages-old4090-hfround.safetensors
+f282328ca9401ed544ee5f8cba30874fa65d5f62e3feae8d277e522a7188d927  layer32-full-stages-vs-hf-old4090-hfround.json
+37153b9032e8208bc0063793be0a13df9e113fb75523aba164cccd038fe314d8  layer32-full-stages-vs-hf-old4090-hfround.txt
+59a1fd1f570a507c9a9c648a0295454d4b82a0d27dcd80b3f3845cc54eb20e86  layer33-full-stages-vs-hf-old4090-hfround.json
+6f81bb1f00b839074d44d37cf37d4703504c14d736065cbb5dad9500f8d0c0b9  layer33-full-stages-vs-hf-old4090-hfround.txt
+7b0a87cbafc93c4423085ecad7c0594ea8bd620877dd69ab09354e04ed045509  layer34-full-stages-vs-hf-old4090-hfround.json
+7bb286da19e7aa49d46018a271d808a50d2dd9e0056af0ecdb05d2ae2d863ddb  layer34-full-stages-vs-hf-old4090-hfround.txt
+e3f9607c1278f00ce9e9e03acb99230f867ac199a4e941923815ee13e86a49cd  layer35-full-stages-vs-hf-old4090-hfround.json
+aecb76d3125d74008e8f2138e4ed4b54b0722f0e618953763f6b6eeef88d5fa4  layer35-full-stages-vs-hf-old4090-hfround.txt
+8cab16b9bfeaaf643ae76bca873c502ecf37df5e49403220c0d13933f2a796a8  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.json
+6157e74e8eb350b5efbc812501d27c7df40edb3134a9d54fed711b2dc04d0192  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.txt
 ```

@@ -22,6 +22,12 @@ PROMPT_TENSORS = (
     "prompt.attention_mask",
     "prompt.lengths",
 )
+NUM_LAYERS = 36
+FINAL_LAYER_IDX = NUM_LAYERS - 1
+FINAL_LAYER_HIDDEN_TRACE_KEYS = {
+    f"layer.{FINAL_LAYER_IDX:02}.last_hidden.bf16",
+    f"layer.{FINAL_LAYER_IDX:02}.sequence_hidden.bf16",
+}
 STAGE_SUFFIX_ALIASES = {
     "input_norm": "input_layernorm.output",
     "q_proj": "self_attn.q_proj.output",
@@ -76,6 +82,8 @@ def stage_actual_to_trace_name(actual_name: str) -> str | None:
             return "embedding.sequence_hidden.bf16"
         return f"layer.{layer_idx - 1:02}.sequence_hidden.bf16"
     if suffix == "output_hidden":
+        if layer_idx == FINAL_LAYER_IDX:
+            return None
         return f"layer.{layer_idx:02}.sequence_hidden.bf16"
     trace_suffix = STAGE_SUFFIX_ALIASES.get(suffix)
     if trace_suffix is None:
@@ -263,8 +271,8 @@ def select_names(
     include_regex: str,
 ) -> tuple[list[str], list[str], list[str]]:
     pattern = re.compile(include_regex) if include_regex else None
-    golden_names = set(golden)
-    actual_names = set(actual)
+    golden_names = set(golden) - FINAL_LAYER_HIDDEN_TRACE_KEYS
+    actual_names = set(actual) - FINAL_LAYER_HIDDEN_TRACE_KEYS
     if pattern is not None:
         golden_names = {name for name in golden_names if pattern.search(name)}
         actual_names = {name for name in actual_names if pattern.search(name)}
