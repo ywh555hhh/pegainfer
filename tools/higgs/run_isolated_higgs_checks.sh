@@ -148,6 +148,49 @@ python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summar
   --expected-sglang-omni-commit abc1234 \
   --check-files
 
+printf '%s\n' \
+  'python.version=3.12 isolated' \
+  'pyproject.dependency.torch=torch==2.11.0' \
+  'pyproject.dependency.sglang=sglang==0.5.16' \
+  'package.torch.version=2.6.0' \
+  'package.torch.cuda=12.8' \
+  'package.torch.has_cuda_begin_allocate_current_thread_to_pool=fail' \
+  'package.sglang.version=0.5.16' \
+  'package.transformers.version=5.12.1' \
+  'direct_higgs_imports=ok' \
+  'full_higgs_model_import=ImportError:torch stack mismatch' \
+  >"$summary_tmp/runtime-readiness-fail.txt"
+printf '%s\n' \
+  'status=fail' \
+  "repo=$repo_root" \
+  'commit=isolated' \
+  'label=isolated-fail' \
+  'python=python3' \
+  'python_version=3.12 isolated' \
+  'sglang_omni_src=/src/sglang-omni' \
+  'sglang_omni_commit=abc1234' \
+  "readiness_log=$summary_tmp/runtime-readiness-fail.txt" \
+  'pyproject_torch=torch==2.11.0' \
+  'pyproject_sglang=sglang==0.5.16' \
+  'torch_version=2.6.0' \
+  'torch_cuda=12.8' \
+  'torch_has_cuda_pool_api=fail' \
+  'sglang_version=0.5.16' \
+  'transformers_version=5.12.1' \
+  'sglang_omni_direct_imports=ok' \
+  'sglang_omni_full_model_import=ImportError:torch stack mismatch' \
+  'runtime_ready=fail' \
+  'artifacts_nonempty=ok' \
+  >"$summary_tmp/runtime-readiness-fail-gate.txt"
+python3 "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summary.py" \
+  "$summary_tmp/runtime-readiness-fail-gate.txt" \
+  --expected-status fail \
+  --expected-label isolated-fail \
+  --expected-python python3 \
+  --expected-sglang-omni-src /src/sglang-omni \
+  --expected-sglang-omni-commit abc1234 \
+  --check-files
+
 cat >"$tmp_root/Cargo.toml" <<'TOML'
 [workspace]
 resolver = "3"

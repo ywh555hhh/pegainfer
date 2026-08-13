@@ -92,6 +92,14 @@ def validate(args: argparse.Namespace) -> dict[str, str]:
     require_equal(values, "sglang_omni_src", args.expected_sglang_omni_src)
     require_equal(values, "sglang_omni_commit", args.expected_sglang_omni_commit)
 
+    if values["status"] not in {"ok", "fail"}:
+        raise ValueError(f"status must be 'ok' or 'fail', got {values['status']!r}")
+
+    if values["runtime_ready"] not in {"ok", "fail"}:
+        raise ValueError(
+            f"runtime_ready must be 'ok' or 'fail', got {values['runtime_ready']!r}"
+        )
+
     if values["status"] == "ok":
         for key in OK_KEYS:
             if values[key] != "ok":
@@ -128,6 +136,9 @@ def validate(args: argparse.Namespace) -> dict[str, str]:
 
     if values["status"] == "ok" and values["runtime_ready"] != "ok":
         raise ValueError("status=ok requires runtime_ready=ok")
+
+    if values["status"] == "fail" and values["runtime_ready"] == "ok":
+        raise ValueError("status=fail cannot report runtime_ready=ok")
 
     if args.check_files:
         readiness_log = Path(values["readiness_log"])
