@@ -1,0 +1,8 @@
+layer35.input_norm: direct_output_mean=0.01005320 direct_output_cos=0.999992728
+  single_round_fp32_weight golden_fit=0.00415521 actual_fit=0.00000000 actual_vs_golden=0.01005320
+  bf16_mid_fp32_weight     golden_fit=0.00000000 actual_fit=0.00371521 actual_vs_golden=0.00817736
+  hf_like_bf16_mid         golden_fit=0.00000000 actual_fit=0.00371521 actual_vs_golden=0.00817736
+final_norm: direct_output_mean=0.00640291 direct_output_cos=0.999991894
+  single_round_fp32_weight golden_fit=0.00743424 actual_fit=0.00000000 actual_vs_golden=0.00640291
+  bf16_mid_fp32_weight     golden_fit=0.00701225 actual_fit=0.00143576 actual_vs_golden=0.00634772
+  hf_like_bf16_mid         golden_fit=0.00701225 actual_fit=0.00143576 actual_vs_golden=0.00634772

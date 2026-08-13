@@ -1,0 +1,151 @@
+{
+  "device": "cuda:0",
+  "eps": 1e-06,
+  "layer1.input_norm": {
+    "direct_input_actual_vs_golden": {
+      "cosine": 0.9999966621398926,
+      "max_abs": 0.125,
+      "mean_abs": 0.0018369853496551514,
+      "name": "layer1.input_norm.input_actual_vs_golden",
+      "p99_abs": 0.015625,
+      "rmse": 0.0045964983291924,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    "direct_output_actual_vs_golden": {
+      "cosine": 0.9999824166297913,
+      "max_abs": 0.00146484375,
+      "mean_abs": 5.740358028560877e-05,
+      "name": "layer1.input_norm.output_actual_vs_golden",
+      "p99_abs": 0.00048828125,
+      "rmse": 0.00010976965859299526,
+      "shape": [
+        1,
+        2560
+      ]
+    },
+    "variants": [
+      {
+        "actual_recompute_vs_actual_output": {
+          "cosine": 0.9999963045120239,
+          "max_abs": 0.0009765625,
+          "mean_abs": 1.3018399840802886e-05,
+          "name": "layer1.input_norm.bf16_mid_fp32_weight.actual_vs_actual",
+          "p99_abs": 0.0001220703125,
+          "rmse": 5.474483987200074e-05,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "actual_recompute_vs_golden_output": {
+          "cosine": 0.9999852776527405,
+          "max_abs": 0.00146484375,
+          "mean_abs": 5.2452669478952885e-05,
+          "name": "layer1.input_norm.bf16_mid_fp32_weight.actual_vs_golden",
+          "p99_abs": 0.0003662109375,
+          "rmse": 0.00010079021740239114,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "golden_recompute_vs_golden_output": {
+          "cosine": 1.0000007152557373,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "name": "layer1.input_norm.bf16_mid_fp32_weight.golden_vs_golden",
+          "p99_abs": 0.0,
+          "rmse": 0.0,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "variant": "bf16_mid_fp32_weight"
+      },
+      {
+        "actual_recompute_vs_actual_output": {
+          "cosine": 0.9999963045120239,
+          "max_abs": 0.0009765625,
+          "mean_abs": 1.3018399840802886e-05,
+          "name": "layer1.input_norm.hf_like_bf16_mid.actual_vs_actual",
+          "p99_abs": 0.0001220703125,
+          "rmse": 5.474483987200074e-05,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "actual_recompute_vs_golden_output": {
+          "cosine": 0.9999852776527405,
+          "max_abs": 0.00146484375,
+          "mean_abs": 5.2452669478952885e-05,
+          "name": "layer1.input_norm.hf_like_bf16_mid.actual_vs_golden",
+          "p99_abs": 0.0003662109375,
+          "rmse": 0.00010079021740239114,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "golden_recompute_vs_golden_output": {
+          "cosine": 1.0000007152557373,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "name": "layer1.input_norm.hf_like_bf16_mid.golden_vs_golden",
+          "p99_abs": 0.0,
+          "rmse": 0.0,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "variant": "hf_like_bf16_mid"
+      },
+      {
+        "actual_recompute_vs_actual_output": {
+          "cosine": 1.0000009536743164,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "name": "layer1.input_norm.single_round_fp32_weight.actual_vs_actual",
+          "p99_abs": 0.0,
+          "rmse": 0.0,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "actual_recompute_vs_golden_output": {
+          "cosine": 0.9999824166297913,
+          "max_abs": 0.00146484375,
+          "mean_abs": 5.740358028560877e-05,
+          "name": "layer1.input_norm.single_round_fp32_weight.actual_vs_golden",
+          "p99_abs": 0.00048828125,
+          "rmse": 0.00010976965859299526,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "golden_recompute_vs_golden_output": {
+          "cosine": 0.9999964237213135,
+          "max_abs": 0.0009765625,
+          "mean_abs": 1.3408530321612488e-05,
+          "name": "layer1.input_norm.single_round_fp32_weight.golden_vs_golden",
+          "p99_abs": 0.0001220703125,
+          "rmse": 5.400715599535033e-05,
+          "shape": [
+            1,
+            2560
+          ]
+        },
+        "variant": "single_round_fp32_weight"
+      }
+    ]
+  },
+  "layer_idx": 1,
+  "model_safetensors": "/data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561/model.safetensors"
+}

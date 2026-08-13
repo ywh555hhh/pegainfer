@@ -1,0 +1,4 @@
+layer1.input_norm: direct_output_mean=0.00005740 direct_output_cos=0.999982417
+  single_round_fp32_weight golden_fit=0.00001341 actual_fit=0.00000000 actual_vs_golden=0.00005740
+  bf16_mid_fp32_weight     golden_fit=0.00000000 actual_fit=0.00001302 actual_vs_golden=0.00005245
+  hf_like_bf16_mid         golden_fit=0.00000000 actual_fit=0.00001302 actual_vs_golden=0.00005245

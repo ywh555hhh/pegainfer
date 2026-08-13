@@ -33,6 +33,8 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `higgs-layer{32,33,34,35}-stages-hf-old4090-hfround.safetensors` and `higgs-layer{32,33,34,35}-stages-old4090-hfround.safetensors`: late-layer full-stage HF/SGLang-source goldens and PegaInfer actual dumps after the HF-like fused-add-RMSNorm change.
 - `layer{32,33,34,35}-full-stages-vs-hf-old4090-hfround.{txt,json}`: late-layer full-stage comparisons used to separate real late-layer amplification from a stale rich-trace hidden-state alias.
 - `prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.{txt,json}`: per-layer hidden comparison against the AutoDL rich trace after excluding the known bad `layer.35.{sequence,last}_hidden` aliases from schema v2.
+- `layer1-rmsnorm-drift-old4090-hfround.{txt,json}` and `final-rmsnorm-drift-old4090-hfround.{txt,json}`: plain RMSNorm diagnostic proving PegaInfer's current FlashInfer RMSNorm follows single-round output semantics while HF layer input norms use a bf16-mid-round formula.
+- `higgs-one-step-cuda-gate-old4090-hfrms*.txt` and `semantic-compare-*old4090-hfrms*.txt`: negative-control gates from experimental HF-style plain RMSNorm runtime variants. Both remained semantic-green but worsened strict drift, so the runtime change was rejected and not kept.
 
 ## Results
 
@@ -76,6 +78,11 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - layer0 output hidden improves from `mean_abs=0.002617` to `0.001837`
   - layer1 `post_attn_norm` improves from `0.001059` to `0.000648`, `gate_proj` from `0.008645` to `0.005716`, and `output_hidden` from `0.004883` to `0.003201`
   - one-step trace comparison improves: `final_hidden.mean_abs 0.007636 -> 0.006403`, `audio_logits.mean_abs 0.115132 -> 0.043190`, `audio_top64.logprobs.mean_abs 0.309766 -> 0.044132`, with `audio_argmax.ids` still exact
+- Plain RMSNorm diagnostic and rejected experiment:
+  - `layer1.input_norm` golden recomputes exactly with `hf_like_bf16_mid`, while PegaInfer actual recomputes exactly with `single_round_fp32_weight`; the direct drift is small (`mean_abs=0.00005740`)
+  - `final_norm` shows only marginal formula-level potential (`single_round actual_vs_golden=0.00640291`, `hf_like actual_vs_golden=0.00634772`) and is dominated by upstream hidden drift
+  - implementing an experimental standalone HF-style plain RMSNorm kernel worsened one-step strict drift: full RMSNorm replacement moved `final_hidden.mean_abs` to `0.043077` and `audio_logits.mean_abs` to `0.267468`; final-only replacement moved `final_hidden.mean_abs` to `0.043099` and `audio_logits.mean_abs` to `0.273163`
+  - both negative-control variants preserved semantic argmax correctness, but because they regress strict trace metrics they were rejected and the runtime was restored to the prior hfround baseline
 - Late-layer trace alignment:
   - fresh full-stage HF/SGLang-source goldens show PegaInfer late layers remain high-cosine: layer32/33/34/35 output-hidden cosine is `0.999994576`, `0.999994576`, `0.999990582`, and `0.999991179`
   - late-layer output-hidden mean drift grows gradually rather than jumping: layer32 `0.197028`, layer33 `0.249898`, layer34 `0.546417`, layer35 `1.036249`
@@ -97,6 +104,7 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 9. Residual/fused-add-RMSNorm diagnostics found and fixed a real Qwen3/HF semantic mismatch: PegaInfer had been preserving the BF16 residual-add boundary but not the HF RMSNorm mid-round-before-weight boundary.
 10. The fix is partial but real: it improves layer0/layer1 stage parity and end-to-end trace metrics while keeping one-step semantic and session semantic gates green.
 11. The previous `layer.35.last_hidden` giant drift was not a valid raw-layer oracle. The old rich trace schema labeled the final normed hidden as `layer.35.last_hidden`; future trace generation now skips that alias and stores the final normed hidden only as `final_hidden.bf16`.
+12. Plain RMSNorm remains a documented-but-rejected optimization path for now: the diagnostic identifies a formula difference, but the tested standalone HF-style kernel changes reduction/order enough to regress strict end-to-end metrics. Keep it as an oracle/diagnostic, not a runtime change, unless a future implementation preserves FlashInfer's reduction order while adding the HF rounding boundary.
 
 Next development target: continue from the new first alert (`layer1.k_norm.bf16`, just above the `0.003` mean threshold) and investigate why small early-layer BF16 drift is gradually amplified through late MLP/residual stages while final norm/logits remain high-cosine and argmax-exact. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
@@ -140,6 +148,16 @@ ee37a7c16d21d8435fc23f6bced17fb7028f594810933c45fe39f2202d3852c3  layer1-residua
 208c244c2581884475c1f5af5f25fc1ea953df92d98553b7d02d1c57d03dc690  one-step-actual-vs-trace-old4090-hfround.txt
 c64c4c1fa89cfcfb9310db76182f058aa989a199a128e6e4bef0614d9fbe2af9  prefill-layer-hidden-vs-trace-old4090-hfround.json
 b5da888db80cc61ec626c42fa2b2b6004ae3f5b16bb9455d973969d2af7fa338  prefill-layer-hidden-vs-trace-old4090-hfround.txt
+df495dd94fc679350bb0e6881afc83ffd1908c3723b107745268d6f03b7b4d7a  final-rmsnorm-drift-old4090-hfround.json
+04dd53cd0a8e70059ca2938bcc10eb891847db450b47527fbebc91083debdd01  final-rmsnorm-drift-old4090-hfround.txt
+69d13a948facfd03d764fead4ae6ab1bae2051a7cd1b05a3864c49d0c0359bb5  layer1-rmsnorm-drift-old4090-hfround.json
+1cb86dfeec81c119919811b0c3a2099cd3a541a7268c8b7b097ac2d09d1b534e  layer1-rmsnorm-drift-old4090-hfround.txt
+9be651644291ea26453df4e1179f5b1e0a069759a0a873aa6f81f1c0bb5f317b  higgs-one-step-cuda-gate-old4090-hfrms-finalonly.txt
+f6ae139af7900b2f4d824199dd696513054ba3655e7d80b0d3064d5459e337a3  higgs-one-step-cuda-gate-old4090-hfrms.txt
+87f32049e091134a19b0ba0d87c6d9c1a64cb8a713d987cb8b11dcf79c8cf8f3  semantic-compare-auto-old4090-hfrms-finalonly.txt
+fbf29b6ba96e9d56dec5f8501c879f1649c80e49619781a333b675f4cad1d29b  semantic-compare-auto-old4090-hfrms.txt
+87f32049e091134a19b0ba0d87c6d9c1a64cb8a713d987cb8b11dcf79c8cf8f3  semantic-compare-session-auto-old4090-hfrms-finalonly.txt
+fbf29b6ba96e9d56dec5f8501c879f1649c80e49619781a333b675f4cad1d29b  semantic-compare-session-auto-old4090-hfrms.txt
 3ea92a9ddc31a2919500959c686e6c96442bdb27eeae23a8dbb8e6083520b4c2  higgs-layer32-stages-hf-old4090-hfround.safetensors
 ea81cdee5981b5eae0d0139d0489147c0e48760c4ea500d703cf5c7eff486730  higgs-layer32-stages-old4090-hfround.safetensors
 a4dc69eddbdb8c013208abf69a2ba7a75ef4e76f9d9feec28ccfd8e3b7df1b27  higgs-layer33-stages-hf-old4090-hfround.safetensors

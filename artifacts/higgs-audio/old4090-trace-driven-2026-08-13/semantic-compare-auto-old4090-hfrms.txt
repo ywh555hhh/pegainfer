@@ -1,0 +1,15 @@
+higgs one-step strict comparison:
+  prompt.input_ids_padded          pass=true elems=10 exact_mismatch=0 max_abs=0.000000 mean_abs=0.000000 rmse=0.000000 p99_abs=0.000000 abs_tol=0.000000 mean_tol=0.000000
+  prompt.attention_mask            pass=true elems=10 exact_mismatch=0 max_abs=0.000000 mean_abs=0.000000 rmse=0.000000 p99_abs=0.000000 abs_tol=0.000000 mean_tol=0.000000
+  prompt.lengths                   pass=true elems=1 exact_mismatch=0 max_abs=0.000000 mean_abs=0.000000 rmse=0.000000 p99_abs=0.000000 abs_tol=0.000000 mean_tol=0.000000
+  final_hidden.bf16                pass=false elems=2560 exact_mismatch=0 max_abs=0.375000 mean_abs=0.043077 rmse=0.056206 p99_abs=0.148438 abs_tol=0.031250 mean_tol=0.003000
+  audio_logits.f32                 pass=false elems=8208 exact_mismatch=0 max_abs=3.000000 mean_abs=0.267468 rmse=0.402975 p99_abs=1.250000 abs_tol=0.050000 mean_tol=0.005000
+  audio_top64.ids                  pass=false elems=512 exact_mismatch=480 max_abs=1013.000000 mean_abs=275.347656 rmse=372.600159 p99_abs=943.000000 abs_tol=0.000000 mean_tol=0.000000
+  audio_top64.logprobs.f32         pass=false elems=512 exact_mismatch=0 max_abs=4.000000 mean_abs=1.738413 rmse=1.927780 p99_abs=3.500000 abs_tol=0.050000 mean_tol=0.005000
+  audio_argmax.ids                 pass=true elems=8 exact_mismatch=0 max_abs=0.000000 mean_abs=0.000000 rmse=0.000000 p99_abs=0.000000 abs_tol=0.000000 mean_tol=0.000000
+higgs one-step strict comparison: passed=false diagnostic_only=true
+higgs one-step semantic comparison:
+  prompt_exact=true argmax_exact=true hidden_cosine=0.999907076 hidden_cosine_min=0.999800026
+  logits_cosine=0.999990404 logits_cosine_min=0.999989986 max_argmax_regret=0.000000 argmax_regret_tol=0.200000
+  top64_min_overlap=44 top64_mean_overlap=51.88 top64_min_overlap_tol=40
+higgs one-step semantic comparison: ok
