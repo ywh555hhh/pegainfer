@@ -1,0 +1,335 @@
+{
+  "autodl_golden_path": "/root/autodl-tmp/results/higgs-one-step-sglang-omni-golden-autodl.safetensors",
+  "autodl_metadata": {
+    "codebook_vocab_size": "1026",
+    "config_sha256": "2ead4442c079ee35c2123a5b197e126e18eccfc0bdb65d31c94767e75d7864d4",
+    "cuda_peak_allocated": "16981426176",
+    "cuda_peak_reserved": "16982736896",
+    "device": "NVIDIA GeForce RTX 4090",
+    "fixture_kind": "higgs-one-step-audio-logits-golden",
+    "hidden_size": "2560",
+    "model_id": "bosonai/higgs-tts-3-4b",
+    "model_index_sha256": "cf2689739828b9b77b7c09f66bc400d147541377f0b58fd6871f826cf4c16010",
+    "model_revision": "7556c17e05201fccd9c8cc120bc216dcc7b5d561",
+    "model_safetensors_size": "9309834930",
+    "num_codebooks": "8",
+    "prompt_count": "1",
+    "prompts_json": "[\"Hello from PegaInfer.\"]",
+    "python": "3.12.3",
+    "reference": "SGLang-Omni Higgs prompt builder plus Transformers Qwen3 backbone plus SGLang fused modality head semantics",
+    "schema_version": "1",
+    "sglang_omni_direct_imports": "text_tokenizer.py;modeling.py",
+    "sglang_omni_full_model_imported": "false",
+    "sglang_omni_reference_files": "sglang_omni/models/higgs_tts/text_tokenizer.py;sglang_omni/models/higgs_tts/modeling.py;sglang_omni/models/higgs_tts/model.py",
+    "sglang_omni_source_commit": "c6980be8",
+    "sglang_omni_source_dir": "/root/autodl-tmp/src/sglang-omni",
+    "tokenizer_json_sha256": "eb883de2de5adc5113f1f02b54830a0ea7cd6ef191cde65c41aceb3737d4d1c1",
+    "torch": "2.12.1+cu130",
+    "transformers": "5.12.1"
+  },
+  "autodl_sha256": "0738d01dc38ba7652c0f6ed38965bd51dff82ab74a1e74eaf7360a36e9837c54",
+  "gpu": "NVIDIA GeForce RTX 4090, 595.71.05, 24564 MiB",
+  "host": "autodl-container-a9c346b8e9-f2562921",
+  "pegainfer_commit": "4d845bb63c3cc97a46ffd4a82a632c1c28338f43",
+  "repo_fixture_path": "/root/autodl-tmp/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors",
+  "repo_metadata": {
+    "codebook_vocab_size": "1026",
+    "config_sha256": "2ead4442c079ee35c2123a5b197e126e18eccfc0bdb65d31c94767e75d7864d4",
+    "cuda_peak_allocated": "16981426176",
+    "cuda_peak_reserved": "16982736896",
+    "device": "NVIDIA GeForce RTX 4090 D",
+    "fixture_kind": "higgs-one-step-audio-logits-golden",
+    "hidden_size": "2560",
+    "model_id": "bosonai/higgs-tts-3-4b",
+    "model_index_sha256": "cf2689739828b9b77b7c09f66bc400d147541377f0b58fd6871f826cf4c16010",
+    "model_revision": "7556c17e05201fccd9c8cc120bc216dcc7b5d561",
+    "model_safetensors_size": "9309834930",
+    "num_codebooks": "8",
+    "prompt_count": "1",
+    "prompts_json": "[\"Hello from PegaInfer.\"]",
+    "python": "3.12.3",
+    "reference": "SGLang-Omni Higgs prompt builder plus Transformers Qwen3 backbone plus SGLang fused modality head semantics",
+    "schema_version": "1",
+    "sglang_omni_reference_files": "sglang_omni/models/higgs_tts/text_tokenizer.py;sglang_omni/models/higgs_tts/modeling.py;sglang_omni/models/higgs_tts/model.py",
+    "tokenizer_json_sha256": "eb883de2de5adc5113f1f02b54830a0ea7cd6ef191cde65c41aceb3737d4d1c1",
+    "torch": "2.6.0a0+ecf3bae40a.nv25.01",
+    "transformers": "5.14.1"
+  },
+  "repo_sha256": "bbaae8018759b7e8f26d2acfb1aefb5bee3e5099d47573bb4ce3c980b6096684",
+  "sglang_omni_commit": "c6980be8ce680deb50e6b366065c9fbd679415d1",
+  "tensor_comparison": {
+    "audio_argmax.ids": {
+      "autodl_dtype": "torch.int64",
+      "autodl_shape": [
+        1,
+        8
+      ],
+      "autodl_value": [
+        [
+          244,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ]
+      ],
+      "exact": true,
+      "in_autodl": true,
+      "in_repo": true,
+      "repo_dtype": "torch.int64",
+      "repo_shape": [
+        1,
+        8
+      ],
+      "repo_value": [
+        [
+          244,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ]
+      ]
+    },
+    "audio_logits.f32": {
+      "allclose_1e-4": false,
+      "autodl_argmax": [
+        [
+          244,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ]
+      ],
+      "autodl_dtype": "torch.float32",
+      "autodl_shape": [
+        1,
+        8,
+        1026
+      ],
+      "exact": false,
+      "in_autodl": true,
+      "in_repo": true,
+      "max_abs": 1.0,
+      "mean_abs": 0.04559576138854027,
+      "repo_argmax": [
+        [
+          244,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ]
+      ],
+      "repo_dtype": "torch.float32",
+      "repo_shape": [
+        1,
+        8,
+        1026
+      ]
+    },
+    "audio_top64.ids": {
+      "autodl_dtype": "torch.int64",
+      "autodl_shape": [
+        1,
+        8,
+        64
+      ],
+      "exact": false,
+      "in_autodl": true,
+      "in_repo": true,
+      "repo_dtype": "torch.int64",
+      "repo_shape": [
+        1,
+        8,
+        64
+      ]
+    },
+    "audio_top64.logprobs.f32": {
+      "allclose_1e-4": false,
+      "autodl_argmax": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "autodl_dtype": "torch.float32",
+      "autodl_shape": [
+        1,
+        8,
+        64
+      ],
+      "exact": false,
+      "in_autodl": true,
+      "in_repo": true,
+      "max_abs": 1.5,
+      "mean_abs": 0.22973215579986572,
+      "repo_argmax": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "repo_dtype": "torch.float32",
+      "repo_shape": [
+        1,
+        8,
+        64
+      ]
+    },
+    "final_hidden.bf16": {
+      "allclose_1e-4": false,
+      "autodl_argmax": [
+        27
+      ],
+      "autodl_dtype": "torch.bfloat16",
+      "autodl_shape": [
+        1,
+        2560
+      ],
+      "exact": false,
+      "in_autodl": true,
+      "in_repo": true,
+      "max_abs": 0.5,
+      "mean_abs": 0.0070122540928423405,
+      "repo_argmax": [
+        27
+      ],
+      "repo_dtype": "torch.bfloat16",
+      "repo_shape": [
+        1,
+        2560
+      ]
+    },
+    "prompt.attention_mask": {
+      "autodl_dtype": "torch.int64",
+      "autodl_shape": [
+        1,
+        10
+      ],
+      "autodl_value": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "exact": true,
+      "in_autodl": true,
+      "in_repo": true,
+      "repo_dtype": "torch.int64",
+      "repo_shape": [
+        1,
+        10
+      ],
+      "repo_value": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "prompt.input_ids_padded": {
+      "autodl_dtype": "torch.int64",
+      "autodl_shape": [
+        1,
+        10
+      ],
+      "autodl_value": [
+        [
+          151667,
+          151672,
+          9707,
+          504,
+          393,
+          11188,
+          641,
+          802,
+          13,
+          151670
+        ]
+      ],
+      "exact": true,
+      "in_autodl": true,
+      "in_repo": true,
+      "repo_dtype": "torch.int64",
+      "repo_shape": [
+        1,
+        10
+      ],
+      "repo_value": [
+        [
+          151667,
+          151672,
+          9707,
+          504,
+          393,
+          11188,
+          641,
+          802,
+          13,
+          151670
+        ]
+      ]
+    },
+    "prompt.lengths": {
+      "autodl_dtype": "torch.int64",
+      "autodl_shape": [
+        1
+      ],
+      "autodl_value": [
+        10
+      ],
+      "exact": true,
+      "in_autodl": true,
+      "in_repo": true,
+      "repo_dtype": "torch.int64",
+      "repo_shape": [
+        1
+      ],
+      "repo_value": [
+        10
+      ]
+    }
+  }
+}

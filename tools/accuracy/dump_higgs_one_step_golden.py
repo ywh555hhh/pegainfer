@@ -34,6 +34,19 @@ REQUIRED_SPECIALS = ("<|tts|>", "<|ref_audio|>", "<|text|>", "<|audio|>")
 DEFAULT_MODEL_ID = "bosonai/higgs-tts-3-4b"
 DEFAULT_REVISION = "7556c17e05201fccd9c8cc120bc216dcc7b5d561"
 DEFAULT_PROMPTS = ("Hello from PegaInfer.",)
+TRACE_MODULE_SUFFIXES = (
+    "input_layernorm",
+    "self_attn.q_proj",
+    "self_attn.k_proj",
+    "self_attn.v_proj",
+    "self_attn.q_norm",
+    "self_attn.k_norm",
+    "self_attn.o_proj",
+    "post_attention_layernorm",
+    "mlp.gate_proj",
+    "mlp.up_proj",
+    "mlp.down_proj",
+)
 
 
 def git_short_commit(path: Path) -> str:
@@ -183,6 +196,54 @@ def load_tokenizer(snapshot_dir: Path, adapter_cls: type[Any]) -> Any:
     return adapter_cls(tokenizer)
 
 
+def trace_tensor(tensor: torch.Tensor) -> torch.Tensor:
+    if torch.is_floating_point(tensor):
+        return tensor.detach().cpu().to(torch.bfloat16).contiguous()
+    return tensor.detach().cpu().contiguous()
+
+
+def first_tensor(value: Any) -> torch.Tensor | None:
+    if isinstance(value, torch.Tensor):
+        return value
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            tensor = first_tensor(item)
+            if tensor is not None:
+                return tensor
+    return None
+
+
+def module_trace_name(module_name: str) -> str | None:
+    if not module_name.startswith("layers."):
+        return None
+    parts = module_name.split(".", 2)
+    if len(parts) != 3 or not parts[1].isdigit():
+        return None
+    layer_idx = int(parts[1])
+    suffix = parts[2]
+    if suffix not in TRACE_MODULE_SUFFIXES:
+        return None
+    return f"layer.{layer_idx:02}.{suffix}.output.bf16"
+
+
+def register_trace_hooks(model: Qwen3Model, tensors: dict[str, torch.Tensor]) -> list[Any]:
+    handles = []
+
+    def make_hook(trace_name: str):
+        def hook(_module: Any, _inputs: tuple[Any, ...], output: Any) -> None:
+            tensor = first_tensor(output)
+            if tensor is not None:
+                tensors[trace_name] = trace_tensor(tensor)
+
+        return hook
+
+    for module_name, module in model.named_modules():
+        trace_name = module_trace_name(module_name)
+        if trace_name is not None:
+            handles.append(module.register_forward_hook(make_hook(trace_name)))
+    return handles
+
+
 def compute_modality_logits(
     last_hidden: torch.Tensor,
     modality_weight: torch.Tensor,
@@ -209,12 +270,78 @@ def compute_modality_logits(
     return head.generate(last_hidden)
 
 
+def add_hidden_state_trace(
+    tensors: dict[str, torch.Tensor],
+    hidden_states: tuple[torch.Tensor, ...] | None,
+    prompt_lens: torch.Tensor,
+) -> None:
+    if hidden_states is None:
+        return
+    cpu_lens = prompt_lens.cpu()
+    for idx, state in enumerate(hidden_states):
+        if idx == 0:
+            sequence_name = "embedding.sequence_hidden.bf16"
+            last_name = "embedding.last_hidden.bf16"
+        else:
+            sequence_name = f"layer.{idx - 1:02}.sequence_hidden.bf16"
+            last_name = f"layer.{idx - 1:02}.last_hidden.bf16"
+        tensors[sequence_name] = trace_tensor(state)
+        rows = []
+        for batch_idx, prompt_len in enumerate(cpu_lens.tolist()):
+            rows.append(state[batch_idx, int(prompt_len) - 1, :])
+        tensors[last_name] = trace_tensor(torch.stack(rows, dim=0))
+
+
+def write_trace_file(
+    out_path: Path,
+    *,
+    base_tensors: dict[str, torch.Tensor],
+    trace_tensors: dict[str, torch.Tensor],
+    hidden_states: tuple[torch.Tensor, ...] | None,
+    prompt_lens: torch.Tensor,
+    last_hidden: torch.Tensor,
+    logits: torch.Tensor,
+    logprobs: torch.Tensor,
+    metadata: dict[str, str],
+) -> int:
+    tensors = dict(base_tensors)
+    add_hidden_state_trace(tensors, hidden_states, prompt_lens)
+    tensors.update(trace_tensors)
+    tensors.update(
+        {
+            "audio_head.input_hidden.bf16": last_hidden.cpu().to(torch.bfloat16),
+            "audio_head.flat_logits.f32": logits.reshape(logits.shape[0], -1)
+            .cpu()
+            .to(torch.float32),
+            "audio_logprobs.f32": logprobs.cpu().to(torch.float32),
+        }
+    )
+    trace_metadata = dict(metadata)
+    trace_metadata.update(
+        {
+            "fixture_kind": "higgs-one-step-trace-golden",
+            "schema_version": "2",
+            "trace_contract": "prompt;embedding;per-layer hidden;per-layer module outputs;qkv/mlp stage hooks;audio-head logits/logprobs/topk/argmax",
+            "trace_tensor_count": str(len(tensors)),
+            "trace_module_suffixes": ";".join(TRACE_MODULE_SUFFIXES),
+        }
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    save_file(tensors, str(out_path), metadata=trace_metadata)
+    return len(tensors)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-id", default=DEFAULT_MODEL_ID)
     ap.add_argument("--revision", default=DEFAULT_REVISION)
     ap.add_argument("--snapshot-dir", default="")
     ap.add_argument("--out", default="test_data/higgs-one-step-audio-logits.safetensors")
+    ap.add_argument(
+        "--trace-out",
+        default="",
+        help="Optional rich trace safetensors path with prompt, per-layer, per-module, and audio-head intermediate tensors.",
+    )
     ap.add_argument("--prompt", action="append", default=[])
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--download", action="store_true")
@@ -282,8 +409,16 @@ def main() -> None:
 
     backbone = load_backbone(model_file, text_cfg, args.device)
     modality_weight = load_modality_head_weight(model_file, args.device)
+    trace_tensors: dict[str, torch.Tensor] = {}
+    trace_hooks = register_trace_hooks(backbone, trace_tensors) if args.trace_out else []
     with torch.inference_mode():
-        out = backbone(input_ids=input_ids, attention_mask=attention_mask, use_cache=False, return_dict=True)
+        out = backbone(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            use_cache=False,
+            return_dict=True,
+            output_hidden_states=bool(args.trace_out),
+        )
         hidden = out.last_hidden_state
         row_idx = torch.arange(len(prompts), device=args.device)
         last_hidden = hidden[row_idx, prompt_lens.to(args.device) - 1, :].contiguous()
@@ -291,6 +426,8 @@ def main() -> None:
         logprobs = torch.log_softmax(logits.to(torch.float32), dim=-1)
         top_vals, top_ids = torch.topk(logprobs, k=64, dim=-1)
         argmax_ids = torch.argmax(logits, dim=-1).to(torch.int64)
+    for handle in trace_hooks:
+        handle.remove()
 
     tensors = {
         "prompt.input_ids_padded": input_ids.cpu().to(torch.int64),
@@ -333,6 +470,20 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     save_file(tensors, str(out_path), metadata=metadata)
     print(f"wrote {out_path} size={out_path.stat().st_size}")
+    if args.trace_out:
+        trace_path = Path(args.trace_out)
+        trace_tensor_count = write_trace_file(
+            trace_path,
+            base_tensors=tensors,
+            trace_tensors=trace_tensors,
+            hidden_states=out.hidden_states,
+            prompt_lens=prompt_lens,
+            last_hidden=last_hidden,
+            logits=logits,
+            logprobs=logprobs,
+            metadata=metadata,
+        )
+        print(f"wrote trace {trace_path} size={trace_path.stat().st_size} tensors={trace_tensor_count}")
     print("argmax", argmax_ids.cpu().tolist())
 
 
