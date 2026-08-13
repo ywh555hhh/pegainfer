@@ -1,0 +1,21 @@
+warning: pegainfer-kernels@0.1.0: Detected CUDA SM targets: sm_89
+warning: pegainfer-kernels@0.1.0: Compiling CUDA kernels for nvcc targets: sm_89
+warning: pegainfer-kernels@0.1.0: Legacy CUDA translation units retired from the runtime build: activation.cu, embedding.cu, fused_attention.cu
+warning: pegainfer-kernels@0.1.0: Compiling CUDA translation units with 8 nvcc job(s)
+warning: pegainfer-kernels@0.1.0: Using FlashInfer include dir: /data/src/pegainfer/pegainfer-kernels/third_party/flashinfer/include
+warning: pegainfer-kernels@0.1.0: DeepSeek V4 CUDA/TileLang kernels disabled; enable the pegainfer-kernels `deepseek-v4` feature to build them
+warning: pegainfer-kernels@0.1.0: Kimi-K2 CUDA kernels disabled; enable the pegainfer-kernels `kimi-k2` feature to build them
+warning: pegainfer-kernels@0.1.0: Using Triton AOT for Qwen3.5 HD256 FlashAttention prefill and GDR chunkwise; basic ops (add, silu_mul, embedding) use native CUDA
+    Finished `release` profile [optimized] target(s) in 0.18s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running `target/release/higgs_dump_one_step_actual --model-dir /data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 --golden /data/src/pegainfer/test_data/higgs-one-step-audio-logits.safetensors --out /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-old4090-hfround-ncu.safetensors`
+==PROF== Connected to process 474200 (/data/src/pegainfer/target/release/higgs_dump_one_step_actual)
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM
+higgs one-step actual dump: ok
+  out: /data/results/pegainfer/higgs-audio/actual/higgs-one-step-actual-cuda-bf16-auto-old4090-hfround-ncu.safetensors
+  audio_head_backend: CudaBf16
+  prompt_tokens: 10
+  hidden_values: 2560
+  audio_logits: 8208
+==PROF== Disconnected from process 474200
