@@ -1,0 +1,25 @@
+prompt_exact=True
+name                         max_abs   mean_abs    p99_abs       rmse      cosine
+layer6.input_hidden.bf16     2.000000   0.012024   0.042969   0.042540  0.999997020
+layer6.input_norm.bf16       0.003906   0.000302   0.001465   0.000422  0.999906063
+layer6.q_proj.bf16           0.015625   0.001301   0.004651   0.001829  0.999986351
+layer6.k_proj.bf16           0.007812   0.001520   0.005803   0.002050  0.999984264
+layer6.v_proj.bf16           0.006836   0.001199   0.003906   0.001530  0.999856472
+layer6.q_norm.bf16           0.062500   0.006737   0.031250   0.010294  0.999981880
+layer6.k_norm.bf16           0.062500   0.007474   0.037266   0.011789  0.999981523
+layer6.q_norm_rope.bf16      0.062500   0.007012   0.031250   0.010592  0.999980807
+layer6.k_norm_rope.bf16      0.062500   0.007772   0.042969   0.012220  0.999979973
+layer6.attn_output.bf16      0.009766   0.000798   0.003906   0.001168  0.999901712
+layer6.o_proj.bf16           0.021973   0.004988   0.015625   0.006346  0.999947786
+layer6.post_attn_norm.bf16   0.015625   0.000829   0.002930   0.001121  0.999882042
+layer6.gate_proj.bf16        0.023438   0.003370   0.011719   0.004311  0.999929786
+layer6.up_proj.bf16          0.023438   0.003216   0.010742   0.004106  0.999909997
+layer6.silu_mul.bf16         0.054688   0.000596   0.003174   0.001138  0.999875426
+layer6.down_proj.bf16        0.125000   0.006447   0.020608   0.008843  0.999943316
+layer6.output_hidden.bf16    0.187500   0.012229   0.046875   0.017193  0.999996483
+summary:
+  compared=17
+  first_mean_abs_gt_0.003000=layer6.input_hidden.bf16
+  first_cosine_lt_0.999800000=none
+  worst_mean_abs=layer6.output_hidden.bf16:0.012229
+  worst_cosine=layer6.v_proj.bf16:0.999856472

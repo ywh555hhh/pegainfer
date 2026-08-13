@@ -1,0 +1,149 @@
+{
+  "actual": "/data/results/pegainfer/higgs-audio/actual/higgs-layer13-stages-old4090-hfround.safetensors",
+  "compared": 17,
+  "first_cos_alert": "none",
+  "first_mean_alert": "layer13.input_hidden.bf16",
+  "golden": "/data/results/pegainfer/higgs-audio/golden/higgs-layer13-stages-hf-old4090-hfround.safetensors",
+  "layer_idx": 13,
+  "prompt_exact": true,
+  "rows": [
+    {
+      "cosine": 0.9999961853027344,
+      "max_abs": 1.0,
+      "mean_abs": 0.02104017697274685,
+      "name": "layer13.input_hidden.bf16",
+      "p99_abs": 0.0703125,
+      "rmse": 0.03393120691180229
+    },
+    {
+      "cosine": 0.9999536871910095,
+      "max_abs": 0.00390625,
+      "mean_abs": 0.0004407886299304664,
+      "name": "layer13.input_norm.bf16",
+      "p99_abs": 0.001953125,
+      "rmse": 0.0006071292445994914
+    },
+    {
+      "cosine": 0.9999885559082031,
+      "max_abs": 0.009765625,
+      "mean_abs": 0.001748963026329875,
+      "name": "layer13.q_proj.bf16",
+      "p99_abs": 0.0078125,
+      "rmse": 0.0024715163744986057
+    },
+    {
+      "cosine": 0.9999904632568359,
+      "max_abs": 0.015625,
+      "mean_abs": 0.0018413737416267395,
+      "name": "layer13.k_proj.bf16",
+      "p99_abs": 0.0078125,
+      "rmse": 0.0027769519947469234
+    },
+    {
+      "cosine": 0.999957799911499,
+      "max_abs": 0.008086681365966797,
+      "mean_abs": 0.0019112105946987867,
+      "name": "layer13.v_proj.bf16",
+      "p99_abs": 0.007512211799621582,
+      "rmse": 0.002520947018638253
+    },
+    {
+      "cosine": 0.9999794363975525,
+      "max_abs": 0.0625,
+      "mean_abs": 0.00680564483627677,
+      "name": "layer13.q_norm.bf16",
+      "p99_abs": 0.03125,
+      "rmse": 0.009980241768062115
+    },
+    {
+      "cosine": 0.9999880790710449,
+      "max_abs": 0.0625,
+      "mean_abs": 0.005607523489743471,
+      "name": "layer13.k_norm.bf16",
+      "p99_abs": 0.03125,
+      "rmse": 0.009724105708301067
+    },
+    {
+      "cosine": 0.999976634979248,
+      "max_abs": 0.0625,
+      "mean_abs": 0.007322106976062059,
+      "name": "layer13.q_norm_rope.bf16",
+      "p99_abs": 0.03125,
+      "rmse": 0.010611329227685928
+    },
+    {
+      "cosine": 0.9999879598617554,
+      "max_abs": 0.0625,
+      "mean_abs": 0.0057865530252456665,
+      "name": "layer13.k_norm_rope.bf16",
+      "p99_abs": 0.03125,
+      "rmse": 0.009808720089495182
+    },
+    {
+      "cosine": 0.9998953342437744,
+      "max_abs": 0.015625,
+      "mean_abs": 0.0006101994076743722,
+      "name": "layer13.attn_output.bf16",
+      "p99_abs": 0.0048828125,
+      "rmse": 0.0010827245423570275
+    },
+    {
+      "cosine": 0.9999251961708069,
+      "max_abs": 0.125,
+      "mean_abs": 0.004809732548892498,
+      "name": "layer13.o_proj.bf16",
+      "p99_abs": 0.015625,
+      "rmse": 0.006770025473088026
+    },
+    {
+      "cosine": 0.9999331831932068,
+      "max_abs": 0.0078125,
+      "mean_abs": 0.000893659598659724,
+      "name": "layer13.post_attn_norm.bf16",
+      "p99_abs": 0.0029296875,
+      "rmse": 0.0011890024179592729
+    },
+    {
+      "cosine": 0.9999698400497437,
+      "max_abs": 0.01953125,
+      "mean_abs": 0.0035959992092102766,
+      "name": "layer13.gate_proj.bf16",
+      "p99_abs": 0.01171875,
+      "rmse": 0.004693931899964809
+    },
+    {
+      "cosine": 0.9999452829360962,
+      "max_abs": 0.021484375,
+      "mean_abs": 0.003676540683954954,
+      "name": "layer13.up_proj.bf16",
+      "p99_abs": 0.01171875,
+      "rmse": 0.004700805526226759
+    },
+    {
+      "cosine": 0.9999125599861145,
+      "max_abs": 0.01953125,
+      "mean_abs": 0.0008917975355871022,
+      "name": "layer13.silu_mul.bf16",
+      "p99_abs": 0.0048828125,
+      "rmse": 0.0013673467328771949
+    },
+    {
+      "cosine": 0.9999522566795349,
+      "max_abs": 0.046875,
+      "mean_abs": 0.008881506510078907,
+      "name": "layer13.down_proj.bf16",
+      "p99_abs": 0.03125,
+      "rmse": 0.011400907300412655
+    },
+    {
+      "cosine": 0.9999968409538269,
+      "max_abs": 1.0,
+      "mean_abs": 0.022183310240507126,
+      "name": "layer13.output_hidden.bf16",
+      "p99_abs": 0.09375,
+      "rmse": 0.03546112775802612
+    }
+  ],
+  "worst_cosine": "layer13.attn_output.bf16:0.999895334",
+  "worst_mean_abs": "layer13.output_hidden.bf16:0.022183"
+}

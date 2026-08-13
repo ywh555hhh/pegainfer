@@ -35,6 +35,10 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.{txt,json}`: per-layer hidden comparison against the AutoDL rich trace after excluding the known bad `layer.35.{sequence,last}_hidden` aliases from schema v2.
 - `layer1-rmsnorm-drift-old4090-hfround.{txt,json}` and `final-rmsnorm-drift-old4090-hfround.{txt,json}`: plain RMSNorm diagnostic proving PegaInfer's current FlashInfer RMSNorm follows single-round output semantics while HF layer input norms use a bf16-mid-round formula.
 - `higgs-one-step-cuda-gate-old4090-hfrms*.txt` and `semantic-compare-*old4090-hfrms*.txt`: negative-control gates from experimental HF-style plain RMSNorm runtime variants. Both remained semantic-green but worsened strict drift, so the runtime change was rejected and not kept.
+- `higgs-layer{2..31}-stages-hf-old4090-hfround.safetensors` and `higgs-layer{2..31}-stages-old4090-hfround.safetensors`: middle-layer full-stage HF/SGLang-source goldens and PegaInfer actual dumps, completing the 0-35 full-layer sweep.
+- `layer{2..31}-full-stages-vs-hf-old4090-hfround.{txt,json}`: middle-layer full-stage comparisons generated with the same 17-stage comparator used for layers 0, 1, and 32-35.
+- `full-stage-sweep-old4090-hfround-summary.{md,csv,json}`: sweep-level rollup across layers 0-35, including first mean alert, worst stage, selected projection drifts, output-hidden drift, and output cosine.
+- `full-stage-sweep-old4090-hfround-sha256.txt`: SHA256 manifest for the newly added layer2-31 sweep files plus the sweep summary artifacts.
 
 ## Results
 
@@ -88,6 +92,13 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - late-layer output-hidden mean drift grows gradually rather than jumping: layer32 `0.197028`, layer33 `0.249898`, layer34 `0.546417`, layer35 `1.036249`
   - three-way comparison showed the old AutoDL rich trace's `layer.35.last_hidden.bf16` is effectively the final normed hidden, not the raw layer35 decoder output: fresh HF stage vs AutoDL trace at layer35 has `mean_abs=174.776855`, while PegaInfer actual vs fresh HF stage is only `1.036249`
   - after excluding the bad final-layer hidden alias, per-layer hidden vs trace compares 40 tensors; the worst hidden drift is `layer.34.last_hidden.bf16:0.589288`, and `final_hidden.bf16` remains close (`mean_abs=0.006403`, cosine `0.999991894`)
+- Full-layer stage sweep:
+  - the completed sweep compares 36 layers and 17 stages per layer under the hfround runtime baseline
+  - there is no single catastrophic semantic cliff after layer1; output-hidden drift grows gradually while output cosine stays very high
+  - layer1 remains the first local mean alert, now at `layer1.k_norm.bf16`, with worst local drift at `layer1.gate_proj.bf16:0.005716`
+  - layers 2-4 show early MLP gate amplification (`gate_proj` worst mean abs rises from `0.008443` to `0.027967`), then layers 6-33 mostly accumulate through residual/output-hidden drift
+  - layers 34-35 are the largest downstream amplifiers (`down_proj` mean abs `0.340734` and `0.668163`; output-hidden mean abs `0.546417` and `1.036249`) but remain high-cosine (`0.999990582` and `0.999991179`)
+  - this pattern supports a numeric accumulation/amplification hypothesis rather than a missing layout, mask, or layer-order semantic bug
 
 ## Interpretation
 
@@ -105,8 +116,10 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 10. The fix is partial but real: it improves layer0/layer1 stage parity and end-to-end trace metrics while keeping one-step semantic and session semantic gates green.
 11. The previous `layer.35.last_hidden` giant drift was not a valid raw-layer oracle. The old rich trace schema labeled the final normed hidden as `layer.35.last_hidden`; future trace generation now skips that alias and stores the final normed hidden only as `final_hidden.bf16`.
 12. Plain RMSNorm remains a documented-but-rejected optimization path for now: the diagnostic identifies a formula difference, but the tested standalone HF-style kernel changes reduction/order enough to regress strict end-to-end metrics. Keep it as an oracle/diagnostic, not a runtime change, unless a future implementation preserves FlashInfer's reduction order while adding the HF rounding boundary.
+13. The complete 0-35 full-stage sweep turns the next investigation away from broad layer-order debugging and toward controlled numeric diagnostics: the trace does not show a new discrete semantic break after layer1.
+14. The strongest next hypothesis is GEMM/math-mode and BF16 accumulation behavior in selected projections, especially early `gate_proj` amplification and late `down_proj` amplification. Any runtime change must first be predicted by a controlled projection diagnostic and then verified against the full one-step trace.
 
-Next development target: continue from the new first alert (`layer1.k_norm.bf16`, just above the `0.003` mean threshold) and investigate why small early-layer BF16 drift is gradually amplified through late MLP/residual stages while final norm/logits remain high-cosine and argmax-exact. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
+Next development target: use a controlled GEMM/cuBLAS projection harness for layers 1, 2, 34, and 35, then profile the real one-step path with nsys/ncu before attempting another runtime change. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -176,4 +189,7 @@ e3f9607c1278f00ce9e9e03acb99230f867ac199a4e941923815ee13e86a49cd  layer35-full-s
 aecb76d3125d74008e8f2138e4ed4b54b0722f0e618953763f6b6eeef88d5fa4  layer35-full-stages-vs-hf-old4090-hfround.txt
 8cab16b9bfeaaf643ae76bca873c502ecf37df5e49403220c0d13933f2a796a8  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.json
 6157e74e8eb350b5efbc812501d27c7df40edb3134a9d54fed711b2dc04d0192  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.txt
+bc61f10336a4fca9af022dedb349119cb3f9716d767e80901a0086b46ad69e22  full-stage-sweep-old4090-hfround-sha256.txt
 ```
+
+The complete SHA256 list for the newly added layer2-31 full-stage sweep is stored in `full-stage-sweep-old4090-hfround-sha256.txt`.
