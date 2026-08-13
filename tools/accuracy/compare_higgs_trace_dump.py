@@ -22,6 +22,21 @@ PROMPT_TENSORS = (
     "prompt.attention_mask",
     "prompt.lengths",
 )
+LAYER0_STAGE_ALIASES = {
+    "layer0.input_hidden.bf16": "embedding.sequence_hidden.bf16",
+    "layer0.input_norm.bf16": "layer.00.input_layernorm.output.bf16",
+    "layer0.q_proj.bf16": "layer.00.self_attn.q_proj.output.bf16",
+    "layer0.k_proj.bf16": "layer.00.self_attn.k_proj.output.bf16",
+    "layer0.v_proj.bf16": "layer.00.self_attn.v_proj.output.bf16",
+    "layer0.q_norm.bf16": "layer.00.self_attn.q_norm.output.bf16",
+    "layer0.k_norm.bf16": "layer.00.self_attn.k_norm.output.bf16",
+    "layer0.o_proj.bf16": "layer.00.self_attn.o_proj.output.bf16",
+    "layer0.post_attn_norm.bf16": "layer.00.post_attention_layernorm.output.bf16",
+    "layer0.gate_proj.bf16": "layer.00.mlp.gate_proj.output.bf16",
+    "layer0.up_proj.bf16": "layer.00.mlp.up_proj.output.bf16",
+    "layer0.down_proj.bf16": "layer.00.mlp.down_proj.output.bf16",
+    "layer0.output_hidden.bf16": "layer.00.sequence_hidden.bf16",
+}
 
 
 @dataclass
@@ -37,6 +52,13 @@ class TensorStats:
     exact: bool
     alert: bool
     reason: str
+
+
+@dataclass
+class CompareItem:
+    display_name: str
+    golden_name: str
+    actual_name: str
 
 
 def natural_key(name: str) -> tuple:
@@ -83,15 +105,44 @@ def cosine(left: torch.Tensor, right: torch.Tensor) -> float:
     return float(torch.nn.functional.cosine_similarity(left_flat, right_flat, dim=0))
 
 
+def last_token_from_sequence(sequence: torch.Tensor, prompt_lengths: torch.Tensor) -> torch.Tensor:
+    if sequence.ndim < 3:
+        return sequence
+    rows = []
+    for batch_idx, prompt_len in enumerate(prompt_lengths.tolist()):
+        rows.append(sequence[batch_idx, int(prompt_len) - 1])
+    return torch.stack(rows, dim=0)
+
+
+def align_golden_to_actual(
+    golden: torch.Tensor,
+    actual: torch.Tensor,
+    prompt_lengths: torch.Tensor | None,
+) -> torch.Tensor:
+    if tuple(golden.shape) == tuple(actual.shape):
+        return golden
+    if prompt_lengths is not None and golden.ndim >= 3:
+        last = last_token_from_sequence(golden, prompt_lengths)
+        if tuple(last.shape) == tuple(actual.shape):
+            return last
+        if actual.ndim == 2 and last.ndim > 2 and last.shape[0] == actual.shape[0]:
+            flattened = last.reshape(last.shape[0], -1)
+            if tuple(flattened.shape) == tuple(actual.shape):
+                return flattened
+    return golden
+
+
 def compare_tensor(
     name: str,
     golden: torch.Tensor,
     actual: torch.Tensor,
     *,
+    prompt_lengths: torch.Tensor | None,
     mean_alert: float,
     cosine_alert: float,
     max_alert: float | None,
 ) -> TensorStats:
+    golden = align_golden_to_actual(golden, actual, prompt_lengths)
     if tuple(golden.shape) != tuple(actual.shape):
         return TensorStats(
             name=name,
@@ -178,6 +229,36 @@ def select_names(
     return common, missing_from_actual, extra_actual
 
 
+def select_items(
+    golden: dict[str, torch.Tensor],
+    actual: dict[str, torch.Tensor],
+    include_regex: str,
+    alias_set: str,
+) -> tuple[list[CompareItem], list[str], list[str]]:
+    if alias_set == "none":
+        common, missing_from_actual, extra_actual = select_names(golden, actual, include_regex)
+        return [CompareItem(name, name, name) for name in common], missing_from_actual, extra_actual
+    if alias_set != "layer0-stage":
+        raise ValueError(f"unknown alias set: {alias_set}")
+
+    pattern = re.compile(include_regex) if include_regex else None
+    items = []
+    missing_from_actual = []
+    missing_from_golden = []
+    for actual_name, golden_name in LAYER0_STAGE_ALIASES.items():
+        display_name = f"{actual_name} -> {golden_name}"
+        if pattern is not None and not (pattern.search(actual_name) or pattern.search(golden_name)):
+            continue
+        if actual_name not in actual:
+            missing_from_actual.append(actual_name)
+            continue
+        if golden_name not in golden:
+            missing_from_golden.append(golden_name)
+            continue
+        items.append(CompareItem(display_name, golden_name, actual_name))
+    return items, missing_from_actual, missing_from_golden
+
+
 def format_float(value: float | None) -> str:
     if value is None:
         return "       n/a"
@@ -197,6 +278,12 @@ def main() -> None:
     parser.add_argument("--cosine-alert", type=float, default=0.9998)
     parser.add_argument("--max-alert", type=float, default=None)
     parser.add_argument("--include-regex", default="")
+    parser.add_argument(
+        "--alias-set",
+        choices=("none", "layer0-stage"),
+        default="none",
+        help="Optional built-in mapping from a partial actual dump schema to the trace golden schema.",
+    )
     parser.add_argument("--top", type=int, default=120)
     parser.add_argument("--json-out", type=Path, default=None)
     parser.add_argument("--require-all", action="store_true")
@@ -205,20 +292,24 @@ def main() -> None:
 
     golden = load_file(str(args.golden), device="cpu")
     actual = load_file(str(args.actual), device="cpu")
-    common, missing_from_actual, extra_actual = select_names(golden, actual, args.include_regex)
-    if not common:
-        raise RuntimeError("no common tensors to compare")
+    items, missing_from_actual, extra_actual = select_items(
+        golden, actual, args.include_regex, args.alias_set
+    )
+    if not items:
+        raise RuntimeError("no comparable tensors to compare")
+    prompt_lengths = golden.get("prompt.lengths")
 
     rows = [
         compare_tensor(
-            name,
-            golden[name],
-            actual[name],
+            item.display_name,
+            golden[item.golden_name],
+            actual[item.actual_name],
+            prompt_lengths=prompt_lengths,
             mean_alert=args.mean_alert,
             cosine_alert=args.cosine_alert,
             max_alert=args.max_alert,
         )
-        for name in common
+        for item in items
     ]
     alerts = [row for row in rows if row.alert]
     first_alert = alerts[0].name if alerts else "none"
@@ -227,7 +318,7 @@ def main() -> None:
     worst_cosine = min(floating_rows, key=lambda row: row.cosine if row.cosine is not None else 1.0, default=None)
 
     print(f"prompt_exact={prompt_exact(golden, actual)}")
-    print(f"common_tensors={len(common)}")
+    print(f"common_tensors={len(items)}")
     print(f"missing_from_actual={len(missing_from_actual)}")
     print(f"extra_actual={len(extra_actual)}")
     print("name                                                       max_abs   mean_abs    p99_abs       rmse      cosine  exact  alert  reason")
@@ -257,7 +348,9 @@ def main() -> None:
                 "golden": str(args.golden),
                 "actual": str(args.actual),
                 "prompt_exact": prompt_exact(golden, actual),
-                "common_tensors": len(common),
+                "common_tensors": len(items),
+                "alias_set": args.alias_set,
+                "items": [asdict(item) for item in items],
                 "missing_from_actual": missing_from_actual,
                 "extra_actual": extra_actual,
                 "alerts": len(alerts),
