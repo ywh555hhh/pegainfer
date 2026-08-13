@@ -24,6 +24,7 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `layer1-qk-norm-drift-old4090-dev.json`: q/k RMSNorm diagnostic recomputing HF-like norm variants from golden/actual projections plus checkpoint q/k norm weights.
 - `higgs-layer{0,1}-stages-hf-old4090-dev.safetensors`: HF/SGLang-source layer-stage goldens with 17 stages, including RoPE, attention output, and SiLU input stages that the rich trace does not expose directly.
 - `layer{0,1}-full-stages-vs-hf-old4090-dev.{txt,json}`: PegaInfer actual stage dumps compared against the full 17-stage HF/SGLang-source goldens.
+- `layer{0,1}-projection-drift-old4090-dev.{txt,json}`: projection diagnostics recomputing q/k/v/o/gate/up/down from golden and actual inputs plus checkpoint weights.
 
 ## Results
 
@@ -57,6 +58,10 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - layer0 compared 17 stages with `first_mean_abs_gt_0.003000=none`; worst mean abs remains `layer0.output_hidden.bf16:0.002617`
   - layer1 compared 17 stages with first mean alert at `layer1.q_norm.bf16`; q/k norm remains explained by the recompute diagnostic
   - layer1 attention output is stable (`mean_abs=0.000295`), while downstream MLP projection stages show larger propagated drift (`gate_proj mean_abs=0.008645`, `up_proj mean_abs=0.005325`)
+- Projection recompute diagnostic:
+  - layer1 actual-input recompute matches PegaInfer actual outputs closely: q/k/v/o projection recompute mean abs is <= `0.00000238`, gate/up/down is <= `0.00008011`
+  - layer1 actual-vs-golden projection drift is much larger than the recompute residual: `gate_proj mean_abs=0.008645`, `up_proj mean_abs=0.005325`, `down_proj mean_abs=0.002628`
+  - projection/storage boundaries are therefore explained by upstream input drift and BF16 linear amplification, not by a projection weight layout or GEMM call-site mismatch
 
 ## Interpretation
 
@@ -68,9 +73,10 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 4. The first layer-level drift worth investigating is `layer.01.last_hidden.bf16`.
 5. Layer1 substage comparison initially narrowed the first execution-order alert to q/k RMSNorm (`layer1.q_norm.bf16`, then `layer1.k_norm.bf16`), after input hidden and q/k/v projections remain within thresholds.
 6. The q/k RMSNorm recompute diagnostic rules out a q/k RMSNorm semantics mismatch: both golden and actual projections reproduce their corresponding q/k norm tensors exactly under the HF-like bf16-mid rounding formula.
-7. Full-stage HF/SGLang-source goldens confirm layer0 is within tolerance across all 17 exposed stages and show layer1 attention output is not the dominant drift amplifier; the next useful target is projection/MLP numeric drift, not q/k norm or attention semantics.
+7. Full-stage HF/SGLang-source goldens confirm layer0 is within tolerance across all 17 exposed stages and show layer1 attention output is not the dominant drift amplifier.
+8. Projection recompute diagnostics rule out a projection weight-layout/GEMM call-site mismatch: the same checkpoint weights reproduce PegaInfer actual projection outputs from PegaInfer actual inputs with tiny residuals.
 
-Next development target: inspect whether layer0 output-hidden drift and layer1 MLP projection drift are acceptable BF16/cuBLAS accumulation drift or whether a more exact projection diagnostic is needed. Do not hack around drift by injecting trace tensors or hardcoding outputs; the trace is only an oracle for locating and explaining divergence.
+Next development target: inspect residual add / fused-add-rms rounding and whole-layer propagation thresholds, because q/k norm, attention output, and projection storage/GEMM semantics are now explained without hacks. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -83,10 +89,14 @@ b42337ad855e0ed055f5c7e40af68fe016c40e1f60335bfbdf2e8d743e4ab569  higgs-one-step
 6066ba530c6a3e7dce6c31e7514e7f6cb673a3a2e22fed9ea4906fc3e7936790  higgs-prefill-layer-hidden-old4090-ef7b8d4.safetensors
 60b0af25df2534e3a685d4f2c623ed9a812653f3ea4b76ea2a61cbba8afbc728  layer0-full-stages-vs-hf-old4090-dev.json
 cc87358ac2802269a99917793da1a18806c5b288eb203c1e50ee2dba027ac7b3  layer0-full-stages-vs-hf-old4090-dev.txt
+523a59d5ba91c5dfc989a92da39b3f96251066f2bf9ff7ef2f0629bda6679fc5  layer0-projection-drift-old4090-dev.txt
+c7d0b9477c472ca7c150a12adb49f98913df0d7d4922c28c3a61fb37d16fb94b  layer0-projection-drift-old4090-dev.json
 d6932c51429641c2970ffe3fdc3699d3708bb86fce3e811599486b197f152c4e  layer0-stages-vs-trace-old4090-13651bf.json
 b860082458890a3b7c6baec04d51ff2f0f193dd0041f88a9491d4f33ca505cb3  layer0-stages-vs-trace-old4090-13651bf.txt
 b40bbf91203d88869a77aa618f4ea43fadf6792771b71d3c524a649d8b943816  layer1-full-stages-vs-hf-old4090-dev.json
 88debab6a9d4c9a29e4624c817f53a17294ba0d4affd9a411af9d28549d98683  layer1-full-stages-vs-hf-old4090-dev.txt
+ba5af654ae61d48c0fae0d754a17037ed03a9cf7d6af1bba4a26cf0a11c6f5a8  layer1-projection-drift-old4090-dev.txt
+1e8a2afe559e9b66181eb7387ea756d3a79b65b6c36b6cf036e1a1ecb6751128  layer1-projection-drift-old4090-dev.json
 fc19d6cdf6b5f77f45fea35d2c7f82027ac18416b91e6827228ed748648448f1  layer1-stages-vs-trace-old4090-dev-v2.json
 c26fc5f889c1ac0ef9f72454fb0ad4dc14112d117da0a588955a0591f5461e89  layer1-stages-vs-trace-old4090-dev-v2.txt
 e0c205a771b1cf604d5631198fedd00111749b4dce017ca022a34eef66495961  layer1-qk-norm-drift-old4090-dev.json
