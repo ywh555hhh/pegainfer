@@ -1,0 +1,478 @@
+{
+  "actual": "/data/results/pegainfer/higgs-audio/actual/higgs-layer35-stages-old4090-hfround.safetensors",
+  "device": "cuda:0",
+  "golden": "/data/results/pegainfer/higgs-audio/golden/higgs-layer35-stages-hf-old4090-hfround.safetensors",
+  "layer_idx": 35,
+  "model_safetensors": "/data/models/higgs-audio/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561/model.safetensors",
+  "reports": [
+    {
+      "amplification_mean_abs": 4.641747534680483,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999927282333374,
+        "max_abs": 0.75,
+        "mean_abs": 0.010053202509880066,
+        "name": "q_proj.input_actual_vs_golden",
+        "p99_abs": 0.0625,
+        "rmse": 0.026893144473433495,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "input_stage": "layer35.input_norm.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999899864196777,
+        "max_abs": 1.0,
+        "mean_abs": 0.04666442796587944,
+        "name": "q_proj.output_actual_vs_golden",
+        "p99_abs": 0.25,
+        "rmse": 0.06935382634401321,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "output_stage": "layer35.q_proj.bf16",
+      "projection": "q_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.0,
+        "max_abs": 0.015625,
+        "mean_abs": 6.970949470996857e-06,
+        "name": "q_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.00025434925919398665,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999900460243225,
+        "max_abs": 1.0,
+        "mean_abs": 0.04666096717119217,
+        "name": "q_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 0.25,
+        "rmse": 0.06935138255357742,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0000004768371582,
+        "max_abs": 0.015625,
+        "mean_abs": 1.0102987289428711e-05,
+        "name": "q_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.00028365280013531446,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "weight_name": "body.layers.35.self_attn.q_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 5.123500909348278,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999927282333374,
+        "max_abs": 0.75,
+        "mean_abs": 0.010053202509880066,
+        "name": "k_proj.input_actual_vs_golden",
+        "p99_abs": 0.0625,
+        "rmse": 0.026893144473433495,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "input_stage": "layer35.input_norm.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999702572822571,
+        "max_abs": 0.5,
+        "mean_abs": 0.05150759220123291,
+        "name": "k_proj.output_actual_vs_golden",
+        "p99_abs": 0.1875,
+        "rmse": 0.06911363452672958,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "output_stage": "layer35.k_proj.bf16",
+      "projection": "k_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.0000001192092896,
+        "max_abs": 0.03125,
+        "mean_abs": 4.220008850097656e-05,
+        "name": "k_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0010140208760276437,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999703764915466,
+        "max_abs": 0.5,
+        "mean_abs": 0.051488280296325684,
+        "name": "k_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 0.1875,
+        "rmse": 0.06908924877643585,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0,
+        "max_abs": 0.03125,
+        "mean_abs": 3.2007694244384766e-05,
+        "name": "k_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0009771601762622595,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "weight_name": "body.layers.35.self_attn.k_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 6.168888282821396,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999927282333374,
+        "max_abs": 0.75,
+        "mean_abs": 0.010053202509880066,
+        "name": "v_proj.input_actual_vs_golden",
+        "p99_abs": 0.0625,
+        "rmse": 0.026893144473433495,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "input_stage": "layer35.input_norm.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999829530715942,
+        "max_abs": 0.25,
+        "mean_abs": 0.062017083168029785,
+        "name": "v_proj.output_actual_vs_golden",
+        "p99_abs": 0.25,
+        "rmse": 0.0840534195303917,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "output_stage": "layer35.v_proj.bf16",
+      "projection": "v_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.000000238418579,
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "name": "v_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999829530715942,
+        "max_abs": 0.25,
+        "mean_abs": 0.062017083168029785,
+        "name": "v_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 0.25,
+        "rmse": 0.0840534195303917,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0000003576278687,
+        "max_abs": 0.015625,
+        "mean_abs": 1.52587890625e-05,
+        "name": "v_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.00048828125,
+        "shape": [
+          1,
+          1024
+        ]
+      },
+      "weight_name": "body.layers.35.self_attn.v_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 7.1189267226805875,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999922513961792,
+        "max_abs": 0.25,
+        "mean_abs": 0.03791358694434166,
+        "name": "o_proj.input_actual_vs_golden",
+        "p99_abs": 0.25,
+        "rmse": 0.0586651973426342,
+        "shape": [
+          1,
+          4096
+        ]
+      },
+      "input_stage": "layer35.attn_output.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999957084655762,
+        "max_abs": 4.0,
+        "mean_abs": 0.2699040472507477,
+        "name": "o_proj.output_actual_vs_golden",
+        "p99_abs": 1.0,
+        "rmse": 0.40395814180374146,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "output_stage": "layer35.o_proj.bf16",
+      "projection": "o_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.0000008344650269,
+        "max_abs": 0.0625,
+        "mean_abs": 5.092620995128527e-05,
+        "name": "o_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0017487664008513093,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999957084655762,
+        "max_abs": 4.0,
+        "mean_abs": 0.2699053883552551,
+        "name": "o_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 1.0,
+        "rmse": 0.4039393663406372,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0000007152557373,
+        "max_abs": 0.25,
+        "mean_abs": 0.0001260757417185232,
+        "name": "o_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.00509554473683238,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "weight_name": "body.layers.35.self_attn.o_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 8.260802553679497,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999943375587463,
+        "max_abs": 0.5,
+        "mean_abs": 0.004079952836036682,
+        "name": "gate_proj.input_actual_vs_golden",
+        "p99_abs": 0.03125,
+        "rmse": 0.014087703078985214,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "input_stage": "layer35.post_attn_norm.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999940395355225,
+        "max_abs": 0.25,
+        "mean_abs": 0.03370368480682373,
+        "name": "gate_proj.output_actual_vs_golden",
+        "p99_abs": 0.25,
+        "rmse": 0.05461438000202179,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "output_stage": "layer35.gate_proj.bf16",
+      "projection": "gate_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 0.9999997615814209,
+        "max_abs": 0.25,
+        "mean_abs": 4.455192174646072e-05,
+        "name": "gate_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.002840516623109579,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999940395355225,
+        "max_abs": 0.25,
+        "mean_abs": 0.03366657346487045,
+        "name": "gate_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 0.25,
+        "rmse": 0.05454137548804283,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 0.9999996423721313,
+        "max_abs": 0.25,
+        "mean_abs": 6.0225003835512325e-05,
+        "name": "gate_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0035916988272219896,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "weight_name": "body.layers.35.mlp.gate_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 6.876340389552997,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999943375587463,
+        "max_abs": 0.5,
+        "mean_abs": 0.004079952836036682,
+        "name": "up_proj.input_actual_vs_golden",
+        "p99_abs": 0.03125,
+        "rmse": 0.014087703078985214,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "input_stage": "layer35.post_attn_norm.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999757409095764,
+        "max_abs": 0.25,
+        "mean_abs": 0.02805514447391033,
+        "name": "up_proj.output_actual_vs_golden",
+        "p99_abs": 0.12278366088867188,
+        "rmse": 0.0370202399790287,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "output_stage": "layer35.up_proj.bf16",
+      "projection": "up_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.0,
+        "max_abs": 0.0625,
+        "mean_abs": 1.3904155821364839e-05,
+        "name": "up_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0006713532493449748,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999757409095764,
+        "max_abs": 0.25,
+        "mean_abs": 0.028044600039720535,
+        "name": "up_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 0.12128067016601562,
+        "rmse": 0.03700042888522148,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0,
+        "max_abs": 0.0625,
+        "mean_abs": 1.7577953258296475e-05,
+        "name": "up_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.0007875437731854618,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "weight_name": "body.layers.35.mlp.up_proj.weight"
+    },
+    {
+      "amplification_mean_abs": 23.454210667062455,
+      "input_actual_vs_golden": {
+        "cosine": 0.9999901056289673,
+        "max_abs": 4.0,
+        "mean_abs": 0.028487984091043472,
+        "name": "down_proj.input_actual_vs_golden",
+        "p99_abs": 0.28125,
+        "rmse": 0.1176515445113182,
+        "shape": [
+          1,
+          9728
+        ]
+      },
+      "input_stage": "layer35.silu_mul.bf16",
+      "output_actual_vs_golden": {
+        "cosine": 0.9999911785125732,
+        "max_abs": 8.0,
+        "mean_abs": 0.6681631803512573,
+        "name": "down_proj.output_actual_vs_golden",
+        "p99_abs": 2.0,
+        "rmse": 0.9457033276557922,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "output_stage": "layer35.down_proj.bf16",
+      "projection": "down_proj",
+      "recompute_actual_input_vs_actual_output": {
+        "cosine": 1.0000005960464478,
+        "max_abs": 2.0,
+        "mean_abs": 0.0024959235452115536,
+        "name": "down_proj.recompute_actual_input_vs_actual_output",
+        "p99_abs": 0.0009765625,
+        "rmse": 0.05319804698228836,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "recompute_actual_input_vs_golden_output": {
+        "cosine": 0.9999912977218628,
+        "max_abs": 8.0,
+        "mean_abs": 0.666169285774231,
+        "name": "down_proj.recompute_actual_input_vs_golden_output",
+        "p99_abs": 2.0,
+        "rmse": 0.9433960914611816,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "recompute_golden_input_vs_golden_output": {
+        "cosine": 1.0000008344650269,
+        "max_abs": 2.0,
+        "mean_abs": 0.0022423744667321444,
+        "name": "down_proj.recompute_golden_input_vs_golden_output",
+        "p99_abs": 0.0,
+        "rmse": 0.05282994359731674,
+        "shape": [
+          1,
+          2560
+        ]
+      },
+      "weight_name": "body.layers.35.mlp.down_proj.weight"
+    }
+  ]
+}

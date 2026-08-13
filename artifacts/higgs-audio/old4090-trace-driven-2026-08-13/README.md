@@ -39,6 +39,7 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `layer{2..31}-full-stages-vs-hf-old4090-hfround.{txt,json}`: middle-layer full-stage comparisons generated with the same 17-stage comparator used for layers 0, 1, and 32-35.
 - `full-stage-sweep-old4090-hfround-summary.{md,csv,json}`: sweep-level rollup across layers 0-35, including first mean alert, worst stage, selected projection drifts, output-hidden drift, and output cosine.
 - `full-stage-sweep-old4090-hfround-sha256.txt`: SHA256 manifest for the newly added layer2-31 sweep files plus the sweep summary artifacts.
+- `layer{2,34,35}-projection-drift-old4090-hfround.{txt,json}`: controlled projection diagnostics for the first middle-layer alert and the largest late-layer amplifiers, recomputing q/k/v/o/gate/up/down from stage inputs plus checkpoint weights on CUDA.
 
 ## Results
 
@@ -99,6 +100,11 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - layers 2-4 show early MLP gate amplification (`gate_proj` worst mean abs rises from `0.008443` to `0.027967`), then layers 6-33 mostly accumulate through residual/output-hidden drift
   - layers 34-35 are the largest downstream amplifiers (`down_proj` mean abs `0.340734` and `0.668163`; output-hidden mean abs `0.546417` and `1.036249`) but remain high-cosine (`0.999990582` and `0.999991179`)
   - this pattern supports a numeric accumulation/amplification hypothesis rather than a missing layout, mask, or layer-order semantic bug
+- Layer2/34/35 projection diagnostics:
+  - layer2 actual-input recompute matches PegaInfer actual projection outputs tightly: q/k/v residuals are <= `0.00000048`, o/gate/up/down residuals are <= `0.00009316`
+  - layer34 actual-input recompute remains much smaller than actual-vs-golden drift: gate residual `0.00004254` vs output drift `0.02140315`; down residual `0.00413342` vs output drift `0.34073424`
+  - layer35 shows the same pattern: gate residual `0.00004455` vs output drift `0.03370368`; down residual `0.00249592` vs output drift `0.66816318`
+  - this rules out a gross projection weight-layout or call-site mismatch for the selected early and late amplifiers; any GEMM/math-mode change now needs nsys/ncu evidence and a controlled before/after trace gate
 
 ## Interpretation
 
@@ -118,8 +124,9 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 12. Plain RMSNorm remains a documented-but-rejected optimization path for now: the diagnostic identifies a formula difference, but the tested standalone HF-style kernel changes reduction/order enough to regress strict end-to-end metrics. Keep it as an oracle/diagnostic, not a runtime change, unless a future implementation preserves FlashInfer's reduction order while adding the HF rounding boundary.
 13. The complete 0-35 full-stage sweep turns the next investigation away from broad layer-order debugging and toward controlled numeric diagnostics: the trace does not show a new discrete semantic break after layer1.
 14. The strongest next hypothesis is GEMM/math-mode and BF16 accumulation behavior in selected projections, especially early `gate_proj` amplification and late `down_proj` amplification. Any runtime change must first be predicted by a controlled projection diagnostic and then verified against the full one-step trace.
+15. The layer2/34/35 projection recompute pass weakens the direct GEMM call-site-mismatch hypothesis: PegaInfer actual outputs are reproducible from PegaInfer actual inputs and checkpoint weights with much smaller residuals than the accumulated actual-vs-golden drift.
 
-Next development target: use a controlled GEMM/cuBLAS projection harness for layers 1, 2, 34, and 35, then profile the real one-step path with nsys/ncu before attempting another runtime change. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
+Next development target: profile the real one-step path with nsys/ncu and use the results to decide whether any cuBLAS algorithm/math-mode experiment is justified. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -190,6 +197,12 @@ aecb76d3125d74008e8f2138e4ed4b54b0722f0e618953763f6b6eeef88d5fa4  layer35-full-s
 8cab16b9bfeaaf643ae76bca873c502ecf37df5e49403220c0d13933f2a796a8  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.json
 6157e74e8eb350b5efbc812501d27c7df40edb3134a9d54fed711b2dc04d0192  prefill-layer-hidden-vs-trace-old4090-hfround-skip-final-alias.txt
 bc61f10336a4fca9af022dedb349119cb3f9716d767e80901a0086b46ad69e22  full-stage-sweep-old4090-hfround-sha256.txt
+c51b0652c55f7122cddec51d5b972ca8cf749a8db17c5f935221aa48c21d7f34  layer2-projection-drift-old4090-hfround.json
+85fc8f0b3886161585dfa576909b49eadaa788dc18f012f64c68e6cc8ca5ab9f  layer2-projection-drift-old4090-hfround.txt
+33d677d1c99443ac4a3f0e18a7f6ab164525b7b8810edc4009f932c30bb10daa  layer34-projection-drift-old4090-hfround.json
+92f83b7da57a732dadeab0423011507a8531366951ca40d393005715edb66e5b  layer34-projection-drift-old4090-hfround.txt
+fae6fb716943db089b7a935cd27dfa724bcdbe7b381369d0dcfda4c53059a183  layer35-projection-drift-old4090-hfround.json
+b8ecee809463f43c043f399ef766937b72e1abfeb88f99bbf7a16013bdd16679  layer35-projection-drift-old4090-hfround.txt
 ```
 
 The complete SHA256 list for the newly added layer2-31 full-stage sweep is stored in `full-stage-sweep-old4090-hfround-sha256.txt`.
