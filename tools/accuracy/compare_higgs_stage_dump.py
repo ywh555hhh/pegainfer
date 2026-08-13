@@ -4,31 +4,32 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import torch
 from safetensors.torch import load_file
 
 PROMPT_TENSORS = {"prompt.input_ids_padded", "prompt.attention_mask", "prompt.lengths"}
-STAGE_ORDER = [
-    "layer0.input_hidden.bf16",
-    "layer0.input_norm.bf16",
-    "layer0.q_proj.bf16",
-    "layer0.k_proj.bf16",
-    "layer0.v_proj.bf16",
-    "layer0.q_norm.bf16",
-    "layer0.k_norm.bf16",
-    "layer0.q_norm_rope.bf16",
-    "layer0.k_norm_rope.bf16",
-    "layer0.attn_output.bf16",
-    "layer0.o_proj.bf16",
-    "layer0.post_attn_norm.bf16",
-    "layer0.gate_proj.bf16",
-    "layer0.up_proj.bf16",
-    "layer0.silu_mul.bf16",
-    "layer0.down_proj.bf16",
-    "layer0.output_hidden.bf16",
+STAGE_SUFFIX_ORDER = [
+    "input_hidden",
+    "input_norm",
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "q_norm",
+    "k_norm",
+    "q_norm_rope",
+    "k_norm_rope",
+    "attn_output",
+    "o_proj",
+    "post_attn_norm",
+    "gate_proj",
+    "up_proj",
+    "silu_mul",
+    "down_proj",
+    "output_hidden",
 ]
 
 
@@ -71,18 +72,24 @@ def prompt_exact(golden: dict[str, torch.Tensor], actual: dict[str, torch.Tensor
     return all(torch.equal(golden[name], actual[name]) for name in sorted(PROMPT_TENSORS))
 
 
+def stage_order(layer_idx: int) -> list[str]:
+    return [f"layer{layer_idx}.{suffix}.bf16" for suffix in STAGE_SUFFIX_ORDER]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--golden", type=Path, required=True)
     parser.add_argument("--actual", type=Path, required=True)
+    parser.add_argument("--layer-idx", type=int, default=0)
     parser.add_argument("--mean-alert", type=float, default=0.003)
     parser.add_argument("--cosine-alert", type=float, default=0.9998)
+    parser.add_argument("--json-out", type=Path, default=None)
     args = parser.parse_args()
 
     golden = load_file(str(args.golden), device="cpu")
     actual = load_file(str(args.actual), device="cpu")
     common_set = (set(golden) & set(actual)) - PROMPT_TENSORS
-    common = [name for name in STAGE_ORDER if name in common_set]
+    common = [name for name in stage_order(args.layer_idx) if name in common_set]
     common.extend(sorted(common_set - set(common)))
     if not common:
         raise RuntimeError("no common non-prompt tensors to compare")
@@ -103,6 +110,21 @@ def main() -> None:
             first_cos_alert = row.name
     worst_mean = max(rows, key=lambda row: row.mean_abs)
     worst_cosine = min(rows, key=lambda row: row.cosine)
+    payload = {
+        "golden": str(args.golden),
+        "actual": str(args.actual),
+        "layer_idx": args.layer_idx,
+        "prompt_exact": prompt_exact(golden, actual),
+        "compared": len(rows),
+        "first_mean_alert": first_mean_alert or "none",
+        "first_cos_alert": first_cos_alert or "none",
+        "worst_mean_abs": f"{worst_mean.name}:{worst_mean.mean_abs:.6f}",
+        "worst_cosine": f"{worst_cosine.name}:{worst_cosine.cosine:.9f}",
+        "rows": [asdict(row) for row in rows],
+    }
+    if args.json_out is not None:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     print("summary:")
     print(f"  compared={len(rows)}")
     print(f"  first_mean_abs_gt_{args.mean_alert:.6f}={first_mean_alert or 'none'}")
