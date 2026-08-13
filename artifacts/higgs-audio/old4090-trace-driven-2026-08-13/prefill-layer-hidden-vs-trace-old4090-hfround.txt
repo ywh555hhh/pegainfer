@@ -1,0 +1,50 @@
+prompt_exact=True
+common_tensors=38
+missing_from_actual=1
+extra_actual=0
+name                                                       max_abs   mean_abs    p99_abs       rmse      cosine  exact  alert  reason
+embedding.last_hidden.bf16                                   0.000000   0.000000   0.000000   0.000000   1.000000  True  False  ok
+layer.00.last_hidden.bf16                                    0.125000   0.001837   0.015625   0.004596   0.999997 False  False  ok
+layer.01.last_hidden.bf16                                    0.125000   0.003201   0.023438   0.006693   0.999998 False   True  mean_abs>0.003
+layer.02.last_hidden.bf16                                    1.000000   0.006664   0.031250   0.022364   0.999997 False   True  mean_abs>0.003
+layer.03.last_hidden.bf16                                    2.000000   0.008728   0.031250   0.041357   0.999995 False   True  mean_abs>0.003
+layer.04.last_hidden.bf16                                    2.000000   0.011738   0.045722   0.042486   0.999996 False   True  mean_abs>0.003
+layer.05.last_hidden.bf16                                    2.000000   0.012118   0.042969   0.042549   0.999997 False   True  mean_abs>0.003
+layer.06.last_hidden.bf16                                    0.156250   0.012483   0.046875   0.017085   0.999997 False   True  mean_abs>0.003
+layer.07.last_hidden.bf16                                    0.250000   0.016248   0.062500   0.022073   0.999996 False   True  mean_abs>0.003
+layer.08.last_hidden.bf16                                    0.250000   0.018365   0.062500   0.024314   0.999995 False   True  mean_abs>0.003
+layer.09.last_hidden.bf16                                    0.171875   0.020144   0.062500   0.026411   0.999995 False   True  mean_abs>0.003
+layer.10.last_hidden.bf16                                    1.000000   0.021428   0.078125   0.034164   0.999995 False   True  mean_abs>0.003
+layer.11.last_hidden.bf16                                    1.000000   0.021578   0.070312   0.034397   0.999996 False   True  mean_abs>0.003
+layer.12.last_hidden.bf16                                    2.000000   0.021076   0.071113   0.048084   0.999993 False   True  mean_abs>0.003
+layer.13.last_hidden.bf16                                    2.000000   0.022144   0.078125   0.049193   0.999994 False   True  mean_abs>0.003
+layer.14.last_hidden.bf16                                    2.000000   0.022988   0.093750   0.050007   0.999995 False   True  mean_abs>0.003
+layer.15.last_hidden.bf16                                    2.000000   0.023114   0.093750   0.050687   0.999996 False   True  mean_abs>0.003
+layer.16.last_hidden.bf16                                    2.000000   0.022675   0.104765   0.050423   0.999995 False   True  mean_abs>0.003
+layer.17.last_hidden.bf16                                    2.000000   0.023624   0.125000   0.051483   0.999995 False   True  mean_abs>0.003
+layer.18.last_hidden.bf16                                    2.000000   0.023985   0.125000   0.051920   0.999995 False   True  mean_abs>0.003
+layer.19.last_hidden.bf16                                    2.000000   0.030143   0.125000   0.056995   0.999995 False   True  mean_abs>0.003
+layer.20.last_hidden.bf16                                    2.000000   0.032159   0.125000   0.058582   0.999996 False   True  mean_abs>0.003
+layer.21.last_hidden.bf16                                    4.000000   0.036334   0.125000   0.092335   0.999994 False   True  mean_abs>0.003
+layer.22.last_hidden.bf16                                    4.000000   0.040263   0.140625   0.095193   0.999995 False   True  mean_abs>0.003
+layer.23.last_hidden.bf16                                    4.000000   0.052167   0.240780   0.105015   0.999996 False   True  mean_abs>0.003
+layer.24.last_hidden.bf16                                    0.625000   0.057116   0.250000   0.078812   0.999998 False   True  mean_abs>0.003
+layer.25.last_hidden.bf16                                    0.625000   0.064304   0.250000   0.088127   0.999997 False   True  mean_abs>0.003
+layer.26.last_hidden.bf16                                    0.687500   0.071102   0.250000   0.096257   0.999998 False   True  mean_abs>0.003
+layer.27.last_hidden.bf16                                    0.687500   0.078441   0.312500   0.104962   0.999998 False   True  mean_abs>0.003
+layer.28.last_hidden.bf16                                    0.562500   0.086888   0.356560   0.115549   0.999998 False   True  mean_abs>0.003
+layer.29.last_hidden.bf16                                    0.750000   0.100579   0.375000   0.133703   0.999998 False   True  mean_abs>0.003
+layer.30.last_hidden.bf16                                    0.750000   0.115143   0.437500   0.152781   0.999998 False   True  mean_abs>0.003
+layer.31.last_hidden.bf16                                    0.750000   0.134338   0.500000   0.178586   0.999998 False   True  mean_abs>0.003
+layer.32.last_hidden.bf16                                   16.000000   0.185523   0.625000   0.393237   0.999995 False   True  mean_abs>0.003
+layer.33.last_hidden.bf16                                    2.000000   0.240397   0.875000   0.317631   0.999996 False   True  mean_abs>0.003
+layer.34.last_hidden.bf16                                   32.000000   0.589288   4.000000   1.180832   0.999993 False   True  mean_abs>0.003
+layer.35.last_hidden.bf16                                  5681.500000 174.519730 2414.189209 447.269318   0.861162 False   True  mean_abs>0.003;cosine<0.9998
+final_hidden.bf16                                            0.500000   0.006403   0.053280   0.017128   0.999992 False   True  mean_abs>0.003
+summary:
+  compared=38
+  alerts=36
+  first_alert=layer.01.last_hidden.bf16
+  worst_mean_abs=layer.35.last_hidden.bf16:174.519730
+  worst_cosine=layer.35.last_hidden.bf16:0.861161768
+  missing_from_actual_first10=['embedding.sequence_hidden.bf16']

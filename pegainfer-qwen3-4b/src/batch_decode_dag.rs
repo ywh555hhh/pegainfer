@@ -111,7 +111,7 @@ impl<'a> BatchDecodeDag<'a> {
             hidden.seq_len,
             self.model.config.rms_norm_eps,
         ));
-        pegainfer_kernels::ops::fused_add_rms_norm_round_batch_into(
+        pegainfer_kernels::ops::fused_add_rms_norm_round_hf_batch_into(
             &self.model.ctx,
             hidden,
             residual,

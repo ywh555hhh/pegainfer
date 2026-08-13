@@ -211,7 +211,7 @@ impl Qwen3Model {
         self.all_reduce_hidden(&mut bufs.o_buf)?;
 
         // 5+6. Residual add + MLP RMSNorm (fused): hidden += o_buf; normed = rms_norm(hidden)
-        pegainfer_kernels::ops::fused_add_rms_norm_round_batch_into(
+        pegainfer_kernels::ops::fused_add_rms_norm_round_hf_batch_into(
             &self.ctx,
             hidden,
             &bufs.o_buf,
@@ -740,7 +740,7 @@ impl Qwen3Model {
             last_token_idx,
         )?;
 
-        pegainfer_kernels::ops::fused_add_rms_norm_round_batch_into(
+        pegainfer_kernels::ops::fused_add_rms_norm_round_hf_batch_into(
             &self.ctx,
             &mut hidden,
             &bufs.o_buf,

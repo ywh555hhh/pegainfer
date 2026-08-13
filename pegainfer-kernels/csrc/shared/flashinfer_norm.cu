@@ -36,7 +36,7 @@ namespace norm {
 // memory for the RMS reduction. Kimi token correctness currently depends on
 // the separate add kernel's BF16 rounding boundary, so this kernel mirrors the
 // FlashInfer reduction/order but feeds it the rounded BF16 sum.
-template <uint32_t VEC_SIZE, typename T>
+template <uint32_t VEC_SIZE, typename T, bool HF_STYLE_NORM_ROUND>
 __global__ void FusedAddRMSNormRoundKernel(T* __restrict__ hidden,
                                            const T* __restrict__ residual,
                                            T* __restrict__ weight,
@@ -120,7 +120,12 @@ __global__ void FusedAddRMSNormRoundKernel(T* __restrict__ hidden,
     }
 #pragma unroll
     for (uint32_t j = 0; j < VEC_SIZE; j++) {
-      out_vec[j] = rounded_vec[j] * rms_rcp * float(weight_vec[j]);
+      if constexpr (HF_STYLE_NORM_ROUND) {
+        T normed = static_cast<T>(rounded_vec[j] * rms_rcp);
+        out_vec[j] = static_cast<T>(float(normed) * float(weight_vec[j]));
+      } else {
+        out_vec[j] = rounded_vec[j] * rms_rcp * float(weight_vec[j]);
+      }
     }
     if (elem < d) {
       out_vec.store(out + bx * stride_out + elem);
@@ -131,7 +136,7 @@ __global__ void FusedAddRMSNormRoundKernel(T* __restrict__ hidden,
 #endif
 }
 
-template <typename T>
+template <typename T, bool HF_STYLE_NORM_ROUND = false>
 cudaError_t FusedAddRMSNormRound(T* hidden, const T* residual, T* weight, T* out,
                                  uint32_t batch_size, uint32_t d,
                                  uint32_t stride_hidden, uint32_t stride_residual,
@@ -155,7 +160,7 @@ cudaError_t FusedAddRMSNormRound(T* hidden, const T* residual, T* weight, T* out
   config.attrs = attrs;
 
   DISPATCH_ALIGNED_VEC_SIZE(vec_size, VEC_SIZE, {
-    auto kernel = FusedAddRMSNormRoundKernel<VEC_SIZE, T>;
+    auto kernel = FusedAddRMSNormRoundKernel<VEC_SIZE, T, HF_STYLE_NORM_ROUND>;
     FLASHINFER_CUDA_CALL(
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
     FLASHINFER_CUDA_CALL(cudaLaunchKernelEx(&config, kernel, hidden, residual, weight, out, d,
@@ -253,7 +258,22 @@ CUresult fused_add_rms_norm_round_batched_cuda(DType *hidden, const DType *resid
                                                const DType *weight, DType *out,
                                                int hidden_dim, int batch_size,
                                                float eps, cudaStream_t stream) {
-    cudaError_t err = pegainfer::norm::FusedAddRMSNormRound<DType>(
+    cudaError_t err = pegainfer::norm::FusedAddRMSNormRound<DType, false>(
+        hidden, residual, const_cast<DType*>(weight), out,
+        /*batch_size=*/static_cast<uint32_t>(batch_size),
+        /*d=*/static_cast<uint32_t>(hidden_dim),
+        /*stride_hidden=*/static_cast<uint32_t>(hidden_dim),
+        /*stride_residual=*/static_cast<uint32_t>(hidden_dim),
+        /*stride_out=*/static_cast<uint32_t>(hidden_dim),
+        eps, stream);
+    return static_cast<CUresult>(err);
+}
+
+CUresult fused_add_rms_norm_round_hf_batched_cuda(DType *hidden, const DType *residual,
+                                                  const DType *weight, DType *out,
+                                                  int hidden_dim, int batch_size,
+                                                  float eps, cudaStream_t stream) {
+    cudaError_t err = pegainfer::norm::FusedAddRMSNormRound<DType, true>(
         hidden, residual, const_cast<DType*>(weight), out,
         /*batch_size=*/static_cast<uint32_t>(batch_size),
         /*d=*/static_cast<uint32_t>(hidden_dim),

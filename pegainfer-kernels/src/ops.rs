@@ -29,8 +29,8 @@ pub use linear::{
 };
 pub use norm::{
     fused_add_rms_norm_batch_into, fused_add_rms_norm_into, fused_add_rms_norm_round_batch_into,
-    rms_norm, rms_norm_batch_into, rms_norm_batch_offset_into, rms_norm_gated_batch_into,
-    rms_norm_into, rms_norm_offset_into,
+    fused_add_rms_norm_round_hf_batch_into, rms_norm, rms_norm_batch_into,
+    rms_norm_batch_offset_into, rms_norm_gated_batch_into, rms_norm_into, rms_norm_offset_into,
 };
 pub use sampling::{
     BatchSamplingRow, BatchSamplingScratch, argmax, argmax_batch_bf16_into,

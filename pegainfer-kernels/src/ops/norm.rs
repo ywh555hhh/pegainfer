@@ -114,6 +114,31 @@ pub fn fused_add_rms_norm_round_batch_into(
     eps: f32,
     out: &mut HiddenStates,
 ) -> Result<()> {
+    fused_add_rms_norm_round_batch_with(ctx, hidden, residual, weight, eps, out, false)
+}
+
+/// Batched HF/Qwen3-style fused add + RMSNorm.
+/// hidden[i] = bf16(hidden[i] + residual[i]); out[i] = weight * bf16(rms_norm(hidden[i])).
+pub fn fused_add_rms_norm_round_hf_batch_into(
+    ctx: &DeviceContext,
+    hidden: &mut HiddenStates,
+    residual: &HiddenStates,
+    weight: &DeviceVec,
+    eps: f32,
+    out: &mut HiddenStates,
+) -> Result<()> {
+    fused_add_rms_norm_round_batch_with(ctx, hidden, residual, weight, eps, out, true)
+}
+
+fn fused_add_rms_norm_round_batch_with(
+    ctx: &DeviceContext,
+    hidden: &mut HiddenStates,
+    residual: &HiddenStates,
+    weight: &DeviceVec,
+    eps: f32,
+    out: &mut HiddenStates,
+    hf_style_norm_round: bool,
+) -> Result<()> {
     assert_eq!(hidden.hidden_dim, residual.hidden_dim);
     assert_eq!(hidden.hidden_dim, out.hidden_dim);
     assert_eq!(hidden.seq_len, residual.seq_len);
@@ -124,7 +149,12 @@ pub fn fused_add_rms_norm_round_batch_into(
     let (w_ptr, _gw) = weight.data.device_ptr(&ctx.stream);
     let (o_ptr, _go) = out.data.device_ptr_mut(&ctx.stream);
     let result = unsafe {
-        ffi::fused_add_rms_norm_round_batched_cuda(
+        let kernel = if hf_style_norm_round {
+            ffi::fused_add_rms_norm_round_hf_batched_cuda
+        } else {
+            ffi::fused_add_rms_norm_round_batched_cuda
+        };
+        kernel(
             h_ptr as *mut ffi::Half,
             r_ptr as *const ffi::Half,
             w_ptr as *const ffi::Half,

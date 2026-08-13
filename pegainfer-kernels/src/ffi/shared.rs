@@ -445,6 +445,17 @@ unsafe extern "C" {
         stream: CUstream,
     ) -> CUresult;
 
+    pub fn fused_add_rms_norm_round_hf_batched_cuda(
+        hidden: *mut Half,
+        residual: *const Half,
+        weight: *const Half,
+        out: *mut Half,
+        hidden_dim: i32,
+        batch_size: i32,
+        eps: f32,
+        stream: CUstream,
+    ) -> CUresult;
+
     pub fn gemm_per_token_cuda(
         W: *const Half,
         X: *const Half,

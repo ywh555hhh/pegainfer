@@ -1,0 +1,13 @@
+layer=1 device=cuda:0 eps=1e-06
+post_variant                         golden_vs_golden  actual_vs_actual  actual_vs_golden
+bf16_add+bf16_mid_fp32_weight              0.00000000       0.00000000       0.00064849
+bf16_add+hf_like_bf16_mid                  0.00000000       0.00000000       0.00064849
+fp32_add_then_bf16+bf16_mid_fp32_weight       0.00000000       0.00000000       0.00064849
+fp32_add_then_bf16+hf_like_bf16_mid        0.00000000       0.00000000       0.00064849
+bf16_add+fused_round_formula               0.00037234       0.00037608       0.00088190
+fp32_add_then_bf16+fused_round_formula       0.00037234       0.00037608       0.00088190
+output_variant                       golden_vs_golden  actual_vs_actual  actual_vs_golden
+bf16_add+bf16_add                          0.00000000       0.00000000       0.00320134
+bf16_add+fp32_add_then_bf16                0.00000000       0.00000000       0.00320134
+fp32_add_then_bf16+bf16_add                0.00000000       0.00000000       0.00320134
+fp32_add_then_bf16+fp32_add_then_bf16       0.00000000       0.00000000       0.00320134

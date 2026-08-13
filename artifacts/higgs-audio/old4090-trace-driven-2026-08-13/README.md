@@ -25,6 +25,11 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
 - `higgs-layer{0,1}-stages-hf-old4090-dev.safetensors`: HF/SGLang-source layer-stage goldens with 17 stages, including RoPE, attention output, and SiLU input stages that the rich trace does not expose directly.
 - `layer{0,1}-full-stages-vs-hf-old4090-dev.{txt,json}`: PegaInfer actual stage dumps compared against the full 17-stage HF/SGLang-source goldens.
 - `layer{0,1}-projection-drift-old4090-dev.{txt,json}`: projection diagnostics recomputing q/k/v/o/gate/up/down from golden and actual inputs plus checkpoint weights.
+- `higgs-layer{0,1}-stages-old4090-hfround.safetensors`: PegaInfer layer-stage actual dumps after switching Qwen3 fused-add-RMSNorm to HF-like norm rounding.
+- `layer{0,1}-full-stages-vs-hf-old4090-hfround.{txt,json}`: full-stage comparisons after the HF-like fused-add-RMSNorm change.
+- `layer1-residual-drift-old4090-hfround.{txt,json}`: residual/fused-add-RMSNorm diagnostic after the change, proving actual post-attention norm now matches the HF-like branch exactly.
+- `one-step-actual-vs-trace-old4090-hfround.{txt,json}` and `prefill-layer-hidden-vs-trace-old4090-hfround.{txt,json}`: end-to-end and layer-hidden comparisons after the change.
+- `higgs-one-step-cuda-gate-old4090-hfround.txt`: one-step CUDA gate after the change; semantic and session semantic gates remain green.
 
 ## Results
 
@@ -62,6 +67,12 @@ This directory preserves the old RTX 4090D PegaInfer/OpenInfer-side evidence gen
   - layer1 actual-input recompute matches PegaInfer actual outputs closely: q/k/v/o projection recompute mean abs is <= `0.00000238`, gate/up/down is <= `0.00008011`
   - layer1 actual-vs-golden projection drift is much larger than the recompute residual: `gate_proj mean_abs=0.008645`, `up_proj mean_abs=0.005325`, `down_proj mean_abs=0.002628`
   - projection/storage boundaries are therefore explained by upstream input drift and BF16 linear amplification, not by a projection weight layout or GEMM call-site mismatch
+- HF-like fused-add-RMSNorm change:
+  - residual diagnostic before the change showed PegaInfer actual `post_attn_norm` matched `fused_round_formula` exactly, while HF/SGLang golden matched `hf_like_bf16_mid` exactly
+  - after the change, layer1 actual `post_attn_norm` matches the HF-like branch exactly (`actual_vs_actual=0.00000000`) and no longer matches the old fused formula (`actual_vs_actual=0.00037608`)
+  - layer0 output hidden improves from `mean_abs=0.002617` to `0.001837`
+  - layer1 `post_attn_norm` improves from `0.001059` to `0.000648`, `gate_proj` from `0.008645` to `0.005716`, and `output_hidden` from `0.004883` to `0.003201`
+  - one-step trace comparison improves: `final_hidden.mean_abs 0.007636 -> 0.006403`, `audio_logits.mean_abs 0.115132 -> 0.043190`, `audio_top64.logprobs.mean_abs 0.309766 -> 0.044132`, with `audio_argmax.ids` still exact
 
 ## Interpretation
 
@@ -75,8 +86,10 @@ The old 4090 path is suitable for golden-trace-driven development. The current e
 6. The q/k RMSNorm recompute diagnostic rules out a q/k RMSNorm semantics mismatch: both golden and actual projections reproduce their corresponding q/k norm tensors exactly under the HF-like bf16-mid rounding formula.
 7. Full-stage HF/SGLang-source goldens confirm layer0 is within tolerance across all 17 exposed stages and show layer1 attention output is not the dominant drift amplifier.
 8. Projection recompute diagnostics rule out a projection weight-layout/GEMM call-site mismatch: the same checkpoint weights reproduce PegaInfer actual projection outputs from PegaInfer actual inputs with tiny residuals.
+9. Residual/fused-add-RMSNorm diagnostics found and fixed a real Qwen3/HF semantic mismatch: PegaInfer had been preserving the BF16 residual-add boundary but not the HF RMSNorm mid-round-before-weight boundary.
+10. The fix is partial but real: it improves layer0/layer1 stage parity and end-to-end trace metrics while keeping one-step semantic and session semantic gates green.
 
-Next development target: inspect residual add / fused-add-rms rounding and whole-layer propagation thresholds, because q/k norm, attention output, and projection storage/GEMM semantics are now explained without hacks. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
+Next development target: continue from the new first alert (`layer1.k_norm.bf16`, just above the `0.003` mean threshold) and investigate later-layer raw hidden amplification, especially why `layer.35.last_hidden` diverges heavily before final norm while final hidden/logits remain high-cosine and argmax-exact. Do not inject trace tensors or hardcode outputs; the trace is only an oracle for locating and explaining divergence.
 
 ## SHA256
 
@@ -104,4 +117,18 @@ f9a64a5a2961e98036681f70f508c801f760586adf664506122cef1e742d4ff3  one-step-actua
 6647b9e4154961c200f18810608a99fbc28aa64277364cd34429a906ea0837a0  one-step-actual-vs-trace-old4090-ef7b8d4.txt
 a3639507ad3a91b8184eea1684f81470374d5f050c3ab6087c96642d3a849cae  prefill-layer-hidden-vs-trace-old4090-ef7b8d4.json
 51a74863d3d4fb27663165787022e02e8aaacd2cc847277f3a6694416cf1d3c1  prefill-layer-hidden-vs-trace-old4090-ef7b8d4.txt
+e77eecfcf5f1ba4e46d4fe7fb49327b1c6b188f42ad874e6f2d5c5d3d19dee0b  higgs-layer0-stages-old4090-hfround.safetensors
+58c6ca3af6529b37fd3c7e9acace9f1a7c742f2316257188d4e8ad407f505d55  higgs-layer1-stages-old4090-hfround.safetensors
+74dd4a65645f27da4af402ba4595ab32943fcb94d42fcd4eb0952124a9e992c7  higgs-one-step-cuda-gate-old4090-hfround.txt
+271c567923f76043c9b3b0ef62fe8a1ec21c305c531068c4955246f1ff07a3b5  higgs-prefill-layer-hidden-old4090-hfround.safetensors
+238ebb5c4c360957578718787126159460e309d7c979657ca41370f9507d8da4  layer0-full-stages-vs-hf-old4090-hfround.json
+d0d7d17653a50ba8e1dc8fd2e0477d085e8a5903d6f78dfbe7b7e36bae9ffc50  layer0-full-stages-vs-hf-old4090-hfround.txt
+c02a8dc70f48a91f7be3f22eefa46f8181a9e41281941e25b019f57e0426261e  layer1-full-stages-vs-hf-old4090-hfround.json
+2a8fdb1f96a1767625858677d739029b7f798b1cf746387355589fdfcd455870  layer1-full-stages-vs-hf-old4090-hfround.txt
+db0378a324b59c66ddf17af2dc1d3f2a0e34f84f91ce709d44ce033681207a41  layer1-residual-drift-old4090-hfround.json
+ee37a7c16d21d8435fc23f6bced17fb7028f594810933c45fe39f2202d3852c3  layer1-residual-drift-old4090-hfround.txt
+2a485f6b7c027e8860af162db8c1a80f707cdecd7adc5cf13070638afc65885c  one-step-actual-vs-trace-old4090-hfround.json
+208c244c2581884475c1f5af5f25fc1ea953df92d98553b7d02d1c57d03dc690  one-step-actual-vs-trace-old4090-hfround.txt
+c64c4c1fa89cfcfb9310db76182f058aa989a199a128e6e4bef0614d9fbe2af9  prefill-layer-hidden-vs-trace-old4090-hfround.json
+b5da888db80cc61ec626c42fa2b2b6004ae3f5b16bb9455d973969d2af7fa338  prefill-layer-hidden-vs-trace-old4090-hfround.txt
 ```

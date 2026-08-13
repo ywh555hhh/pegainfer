@@ -1,0 +1,20 @@
+prompt_exact=True
+common_tensors=8
+missing_from_actual=473
+extra_actual=0
+name                                                       max_abs   mean_abs    p99_abs       rmse      cosine  exact  alert  reason
+prompt.attention_mask                                             n/a        n/a        n/a        n/a        n/a  True  False  ok
+prompt.input_ids_padded                                           n/a        n/a        n/a        n/a        n/a  True  False  ok
+prompt.lengths                                                    n/a        n/a        n/a        n/a        n/a  True  False  ok
+final_hidden.bf16                                            0.500000   0.006403   0.053280   0.017128   0.999992 False   True  mean_abs>0.003
+audio_argmax.ids                                                  n/a        n/a        n/a        n/a        n/a  True  False  ok
+audio_logits.f32                                             0.500000   0.043190   0.500000   0.131935   1.000004 False   True  mean_abs>0.003
+audio_top64.ids                                                   n/a        n/a        n/a        n/a        n/a False   True  integer_mismatch
+audio_top64.logprobs.f32                                     0.500000   0.044132   0.500000   0.112701   0.999994 False   True  mean_abs>0.003
+summary:
+  compared=8
+  alerts=4
+  first_alert=final_hidden.bf16
+  worst_mean_abs=audio_top64.logprobs.f32:0.044132
+  worst_cosine=final_hidden.bf16:0.999991894
+  missing_from_actual_first10=['embedding.last_hidden.bf16', 'embedding.sequence_hidden.bf16', 'layer.00.input_layernorm.output.bf16', 'layer.00.last_hidden.bf16', 'layer.00.mlp.down_proj.output.bf16', 'layer.00.mlp.gate_proj.output.bf16', 'layer.00.mlp.up_proj.output.bf16', 'layer.00.post_attention_layernorm.output.bf16', 'layer.00.self_attn.k_norm.output.bf16', 'layer.00.self_attn.k_proj.output.bf16']
