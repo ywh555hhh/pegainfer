@@ -30,6 +30,7 @@ mkdir -p "$tmp_root/test_data"
 cp "$repo_root/test_data/higgs-one-step-audio-logits.safetensors" "$tmp_root/test_data/"
 
 python3 -m py_compile \
+  "$repo_root/tools/accuracy/compare_higgs_trace_dump.py" \
   "$repo_root/tools/higgs/check_higgs_gate_summary.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_imports.py" \
   "$repo_root/tools/higgs/check_higgs_sglang_omni_runtime_readiness_summary.py" \
