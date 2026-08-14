@@ -1,0 +1,9 @@
+34f6926ebbe9e6b7fd99de170a93d1c0fb47906606e21f6efef10c6e35e7efe5  higgs-native-codec-vocoder-artifacts-20260814-native-codec-vocoder-pause.tgz
+03027db822262120b5780b74ac54765ac89e3ac488f88040c6dbe83fb7a5ba7f  pegainfer-higgs-audio-source-snapshot-20260814-native-codec-vocoder-pause.tgz
+0ab01e89df3141a13225dfad434cdb88b2a4dd1cf24bd627ee4cf1fc3c4b7a6d  tracked-worktree-diff-20260814-native-codec-vocoder-pause.patch
+f773221344ed3007a8ee40fdca958123cbc7f59efe2d4296aa20e63490d2fd26  worktree-status.txt
+3ef8f6603102bdff5c15f912ead4f95f4a7a2df18b840b23baf6b6a1735c7f62  repo-state.txt
+f06ee9db6054130a2285282ca188844ee872883a4cb97987a841efe9d7d6096a  changed-files.txt
+a3097331b248ea07894d5ade2edaa7d273d501c8e636646ca8b46205606f9a25  ../4090-results-native-codec-vocoder-20260814/higgs-native-e2e-audio-20260814.wav
+fbbdf593d15560afb2fd4ec1d87578a317c650f3acefd69324e2a1299d755059  ../4090-results-native-codec-vocoder-20260814/higgs-native-e2e-report-native-codec-vocoder-20260814.txt
+9a495dbd88ce1dad0b81ddfa21d615a30aeb92e11b15490c244cc97bf4465df4  ../4090-results-native-codec-vocoder-20260814/higgs-native-e2e-trace-native-codec-vocoder-20260814.json

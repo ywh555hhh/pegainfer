@@ -1,0 +1,1049 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 50c34d8c..f11673e8 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3591,8 +3591,11 @@ dependencies = [
+  "half",
+  "memmap2",
+  "pegainfer-core",
++ "pegainfer-frontend",
++ "pegainfer-kernels",
+  "pegainfer-qwen3",
+  "safetensors",
++ "serde",
+  "serde_json",
+  "sha2 0.11.0",
+  "tempfile",
+@@ -3765,6 +3768,7 @@ dependencies = [
+  "pegainfer-frontend",
+  "pegainfer-gemma4",
+  "pegainfer-glm52",
++ "pegainfer-higgs-audio",
+  "pegainfer-kimi-k2",
+  "pegainfer-qwen3",
+  "pegainfer-qwen35",
+diff --git a/docs/index.md b/docs/index.md
+index 5a75f964..72491fe7 100644
+--- a/docs/index.md
++++ b/docs/index.md
+@@ -65,6 +65,18 @@ Organized by domain (model line / subsystem / playbook / lesson) instead of by l
+ | `models/gemma4/tokenizer.md` | Gemma 4 tokenizer/chat-template contracts, gated against a Hugging Face reference (token ids plus all five chat renders, content flattened to strings): BOS comes only from the standalone `chat_template.jinja` (which opens a thought channel and accepts a native system role), EOS is declared three times with three values, the published defaults are sampled rather than greedy, image/audio tokens encode straight from user text so text-only serving must reject them at admission, and one divergence stays open — the server's default content format adds a trailing space to system turns. |
+ | `models/gemma4/hf-golden.md` | The Hugging Face reference for 12B: layer-boundary activations at both ends of both layer types plus top-64 logprobs, over a single-token, a nine-token and a 1024-token (exactly the sliding window) case. Pins three facts the forward path has to match — the embedding scale is bf16 62.0 rather than `sqrt(3840)`, text attention is causal, and `layer_scalar` applies to the layer output after both residual adds. Regeneration is byte-identical and checked with sha256. |
+ 
++## models / higgs-audio
++
++| Path | TL;DR |
++| --- | --- |
++| `models/higgs-audio/a-layer-validation.md` | Higgs-Audio foundation scope: checkpoint/config loading, Qwen3 text-backbone prefill, traceable hidden-state boundaries, and one-step audio-head semantic parity; no full decode, codec, or wav claim. |
++| `models/higgs-audio/4090-migration-runbook.md` | Migration runbook for resuming Higgs-Audio native retained-KV validation on a fresh RTX 4090 host: durable overlay bundle, host requirements, validation command, expected artifacts, and copy-back workflow. |
++| `models/higgs-audio/native-code-generation-plan.md` | Next milestone is native Rust + CUDA incremental audio-code generation, not native wav E2E: feature-gated model-line detection, fail-closed launch boundary, retained prompt KV, repeated code steps, trace artifacts, reference gates, and profiling evidence. |
++| `models/higgs-audio/native-codec-vocoder.md` | Strict trace parity is no longer the next bottleneck; the active native E2E path is a model-local Rust + CUDA codec/vocoder port. Current 4090 slice runs retained codegen through quantizer `project_out`, `fc2`, acoustic decoder `conv1`, and the full decoder block0 residual stack; remaining upsampling blocks and waveform E2E stay fail-closed. |
++| `models/higgs-audio/native-codegen-pr-notes.md` | PR body skeleton for the Higgs-Audio native incremental audio-code-generation slice: scope, design boundary, validation evidence, limitations, and the Qwen3 diagnostic API tradeoff. |
++| `models/higgs-audio/next-stage-todo.md` | Next-stage execution checklist for Higgs-Audio native incremental audio-code generation: lock the review boundary, run 4090 retained-KV trace validation, capture nsys/ncu evidence, and render PR-ready evidence without over-claiming native audio E2E. |
++| `models/higgs-audio/retained-decode-hidden-boundary.md` | Higgs-Audio native audio-code continuation needs final normed hidden from retained-KV Qwen3 decode, but the current public Qwen3 runtime returns sampled text tokens only; records the non-invasive options and next-slice acceptance gate. |
++
+ ## models / glm52
+ 
+ | Path | TL;DR |
+diff --git a/pegainfer-higgs-audio/Cargo.toml b/pegainfer-higgs-audio/Cargo.toml
+index d55e2f35..bd732ee8 100644
+--- a/pegainfer-higgs-audio/Cargo.toml
++++ b/pegainfer-higgs-audio/Cargo.toml
+@@ -10,13 +10,18 @@ clap = { workspace = true }
+ half = { workspace = true }
+ memmap2 = { workspace = true }
+ pegainfer-core = { workspace = true, optional = true }
++pegainfer-frontend = { workspace = true, optional = true }
++pegainfer-kernels = { workspace = true, optional = true }
+ pegainfer-qwen3 = { workspace = true, optional = true }
+ safetensors = { workspace = true }
++serde = { workspace = true }
+ serde_json = { workspace = true }
+ sha2 = { workspace = true }
+ 
+ [features]
+-runtime-qwen3 = ["dep:pegainfer-core", "dep:pegainfer-qwen3"]
++reference-python-codec = []
++server-line = ["dep:pegainfer-frontend"]
++runtime-qwen3 = ["dep:pegainfer-core", "dep:pegainfer-kernels", "dep:pegainfer-qwen3", "pegainfer-kernels/higgs-audio"]
+ 
+ [dev-dependencies]
+ tempfile = { workspace = true }
+@@ -41,5 +46,37 @@ name = "higgs_dump_layer0_stages"
+ path = "src/bin/higgs_dump_layer0_stages.rs"
+ required-features = ["runtime-qwen3"]
+ 
++[[bin]]
++name = "higgs_prepare_codegen_artifacts"
++path = "src/bin/higgs_prepare_codegen_artifacts.rs"
++
++[[bin]]
++name = "higgs_replay_hidden_codegen"
++path = "src/bin/higgs_replay_hidden_codegen.rs"
++
++[[bin]]
++name = "higgs_native_continuation_smoke"
++path = "src/bin/higgs_native_continuation_smoke.rs"
++required-features = ["runtime-qwen3"]
++
++[[bin]]
++name = "higgs_native_forced_prefix_smoke"
++path = "src/bin/higgs_native_forced_prefix_smoke.rs"
++required-features = ["runtime-qwen3"]
++
++[[bin]]
++name = "higgs_compare_codegen_trace"
++path = "src/bin/higgs_compare_codegen_trace.rs"
++
++[[bin]]
++name = "higgs_vocode_codes"
++path = "src/bin/higgs_vocode_codes.rs"
++required-features = ["reference-python-codec"]
++
++[[bin]]
++name = "higgs_native_e2e_smoke"
++path = "src/bin/higgs_native_e2e_smoke.rs"
++required-features = ["runtime-qwen3"]
++
+ [lints]
+ workspace = true
+diff --git a/pegainfer-higgs-audio/src/lib.rs b/pegainfer-higgs-audio/src/lib.rs
+index c42308a7..66dfe241 100644
+--- a/pegainfer-higgs-audio/src/lib.rs
++++ b/pegainfer-higgs-audio/src/lib.rs
+@@ -5,21 +5,29 @@
+ //! behind this boundary in later slices so stale fixture assumptions cannot leak
+ //! into the model implementation.
+ 
++pub mod audio_codegen;
+ pub mod codebook_embedding;
+ pub mod codec_input;
+ pub mod compare;
+ pub mod config;
++pub mod continuation_contract;
+ pub mod decode_session;
++pub mod decode_trace;
+ pub mod delay_pattern;
+ pub mod kernel_plan;
++pub mod launch_preflight;
+ pub mod layer_dump;
+ pub mod load_plan;
+ pub mod materialize_qwen3;
++#[cfg(feature = "server-line")]
++pub mod model_line;
++pub mod native_codec;
+ pub mod one_step_actual;
+ pub mod one_step_golden;
+ #[cfg(feature = "runtime-qwen3")]
+ pub mod runtime_bridge;
+ pub mod runtime_source;
++pub mod trace_compare;
+ pub mod weights;
+ 
+ pub use kernel_plan::kernel_plan;
+diff --git a/pegainfer-higgs-audio/src/runtime_bridge.rs b/pegainfer-higgs-audio/src/runtime_bridge.rs
+index a11a38cb..e36bbb2f 100644
+--- a/pegainfer-higgs-audio/src/runtime_bridge.rs
++++ b/pegainfer-higgs-audio/src/runtime_bridge.rs
+@@ -2,12 +2,17 @@ use std::path::Path;
+ 
+ use anyhow::Context;
+ use anyhow::Result;
++use anyhow::bail;
+ use half::bf16;
+ use pegainfer_core::weight_loader::TensorNameAliases;
+ use pegainfer_qwen3::runtime::Qwen3Executor;
+ use pegainfer_qwen3::runtime::RequestId;
+ 
++use crate::audio_codegen::AudioCodeGenerationSession;
++use crate::audio_codegen::AudioCodeGenerationStep;
++use crate::audio_codegen::AudioCodegenSessionId;
+ use crate::config::HiggsConfig;
++use crate::decode_trace::AudioLogitsSummary;
+ use crate::load_plan::HiggsRuntimeLoadPlan;
+ use crate::materialize_qwen3::write_qwen3_config_view;
+ use crate::one_step_actual::OneStepActualSummary;
+@@ -98,6 +103,29 @@ pub struct HiggsPromptSessionPrefill {
+     pub audio: OneStepAudioPrediction,
+ }
+ 
++#[derive(Debug, Clone, PartialEq)]
++pub struct HiggsAudioCodegenSeed {
++    pub session: HiggsPromptSession,
++    pub codegen: AudioCodeGenerationSession,
++}
++
++#[derive(Debug, Clone, PartialEq)]
++pub struct HiggsContinuationInput {
++    pub session: HiggsPromptSession,
++    pub feedback_embedding: Vec<f32>,
++}
++
++impl HiggsPromptSessionPrefill {
++    pub fn into_audio_codegen_session(self) -> Result<AudioCodeGenerationSession> {
++        let mut session = AudioCodeGenerationSession::new_with_id(
++            AudioCodegenSessionId::new(self.session.id()),
++            self.prompt_tokens,
++        );
++        session.push_prediction(&self.audio)?;
++        Ok(session)
++    }
++}
++
+ impl HiggsAudioRuntime {
+     pub fn from_model_dir(
+         model_dir: impl AsRef<Path>,
+@@ -172,10 +200,23 @@ impl HiggsAudioRuntime {
+         &mut self,
+         session: HiggsPromptSession,
+         prompt_ids: &[u32],
++    ) -> Result<HiggsPromptSessionPrefill> {
++        self.prefill_prompt_session_with_output_budget(session, prompt_ids, 1)
++    }
++
++    pub fn prefill_prompt_session_with_output_budget(
++        &mut self,
++        session: HiggsPromptSession,
++        prompt_ids: &[u32],
++        max_output_tokens: usize,
+     ) -> Result<HiggsPromptSessionPrefill> {
+         let retained = self
+             .executor
+-            .prefill_last_hidden_bf16_retained_prompt(session.request_id(), prompt_ids.to_vec())?;
++            .prefill_last_hidden_bf16_retained_prompt_with_max_output_tokens(
++                session.request_id(),
++                prompt_ids.to_vec(),
++                max_output_tokens,
++            )?;
+         let audio = match self.audio_head_backend {
+             AudioHeadBackend::CudaBf16 => compute_one_step_audio_prediction_gpu_bf16(
+                 &retained.hidden_bf16,
+@@ -194,11 +235,163 @@ impl HiggsAudioRuntime {
+         })
+     }
+ 
++    pub fn start_audio_codegen_session(
++        &mut self,
++        session: HiggsPromptSession,
++        prompt_ids: &[u32],
++    ) -> Result<HiggsAudioCodegenSeed> {
++        self.start_audio_codegen_session_with_output_budget(session, prompt_ids, 1)
++    }
++
++    pub fn start_audio_codegen_session_with_output_budget(
++        &mut self,
++        session: HiggsPromptSession,
++        prompt_ids: &[u32],
++        max_output_tokens: usize,
++    ) -> Result<HiggsAudioCodegenSeed> {
++        let prefill =
++            self.prefill_prompt_session_with_output_budget(session, prompt_ids, max_output_tokens)?;
++        let session = prefill.session;
++        let codegen = prefill.into_audio_codegen_session()?;
++        Ok(HiggsAudioCodegenSeed { session, codegen })
++    }
++
++    pub fn continue_audio_codegen_step(
++        &mut self,
++        input: HiggsContinuationInput,
++        codegen: &mut AudioCodeGenerationSession,
++    ) -> Result<AudioCodeGenerationStep> {
++        validate_continuation_input(input.session, input.feedback_embedding.len(), codegen)?;
++
++        let input_embedding_bf16: Vec<bf16> = input
++            .feedback_embedding
++            .iter()
++            .map(|&value| bf16::from_f32(value))
++            .collect();
++        let hidden = self
++            .executor
++            .decode_embedding_last_hidden_bf16_retained(
++                input.session.request_id(),
++                input_embedding_bf16,
++            )?
++            .hidden_bf16;
++        self.push_audio_codegen_hidden_step_cpu(input.session, codegen, &hidden)
++    }
++
++    pub fn continue_audio_codegen_step_from_feedback(
++        &mut self,
++        session: HiggsPromptSession,
++        codegen: &mut AudioCodeGenerationSession,
++        fused_embedding: &[bf16],
++    ) -> Result<Option<AudioCodeGenerationStep>> {
++        let feedback_embedding = match codegen.feedback_embedding_cpu(fused_embedding)? {
++            Some(feedback_embedding) => feedback_embedding,
++            None => return Ok(None),
++        };
++        self.continue_audio_codegen_step(
++            HiggsContinuationInput {
++                session,
++                feedback_embedding,
++            },
++            codegen,
++        )
++        .map(Some)
++    }
++
++    pub fn continue_audio_codegen_step_from_feedback_with_sampled_codes(
++        &mut self,
++        session: HiggsPromptSession,
++        codegen: &mut AudioCodeGenerationSession,
++        fused_embedding: &[bf16],
++        sampled_codes: Vec<u32>,
++    ) -> Result<Option<AudioCodeGenerationStep>> {
++        let feedback_embedding = match codegen.feedback_embedding_cpu(fused_embedding)? {
++            Some(feedback_embedding) => feedback_embedding,
++            None => return Ok(None),
++        };
++        validate_continuation_input(session, feedback_embedding.len(), codegen)?;
++        let input_embedding_bf16: Vec<bf16> = feedback_embedding
++            .iter()
++            .map(|&value| bf16::from_f32(value))
++            .collect();
++        let hidden = self
++            .executor
++            .decode_embedding_last_hidden_bf16_retained(session.request_id(), input_embedding_bf16)?
++            .hidden_bf16;
++        let prediction = compute_one_step_audio_prediction(&hidden, &self.audio_head)?;
++        validate_codegen_session(session, codegen)?;
++        codegen
++            .push_sampled_codes(
++                sampled_codes,
++                AudioLogitsSummary::from_prediction(&prediction),
++            )
++            .map(Some)
++    }
++
++    pub fn push_audio_codegen_hidden_step_cpu(
++        &mut self,
++        session: HiggsPromptSession,
++        codegen: &mut AudioCodeGenerationSession,
++        final_hidden_bf16: &[bf16],
++    ) -> Result<AudioCodeGenerationStep> {
++        push_audio_codegen_hidden_step_with_head(
++            session,
++            codegen,
++            final_hidden_bf16,
++            &self.audio_head,
++        )
++    }
++
+     pub fn drop_prompt_session(&mut self, session: impl Into<HiggsPromptSession>) -> Result<()> {
+         self.executor.drop_request(session.into().request_id())
+     }
+ }
+ 
++fn validate_continuation_input(
++    session: HiggsPromptSession,
++    feedback_embedding_len: usize,
++    codegen: &AudioCodeGenerationSession,
++) -> Result<()> {
++    if codegen.id() != AudioCodegenSessionId::new(session.id()) {
++        bail!(
++            "Higgs Audio codegen session mismatch: input session={}, codegen session={}",
++            session.id(),
++            codegen.id().get()
++        );
++    }
++    let expected = crate::one_step_golden::HIDDEN_SIZE;
++    if feedback_embedding_len != expected {
++        bail!(
++            "Higgs Audio feedback embedding len mismatch: expected {expected}, got {feedback_embedding_len}"
++        );
++    }
++    Ok(())
++}
++
++fn push_audio_codegen_hidden_step_with_head(
++    session: HiggsPromptSession,
++    codegen: &mut AudioCodeGenerationSession,
++    final_hidden_bf16: &[bf16],
++    audio_head: &[bf16],
++) -> Result<AudioCodeGenerationStep> {
++    validate_codegen_session(session, codegen)?;
++    codegen.push_final_normed_hidden_cpu(final_hidden_bf16, audio_head)
++}
++
++fn validate_codegen_session(
++    session: HiggsPromptSession,
++    codegen: &AudioCodeGenerationSession,
++) -> Result<()> {
++    if codegen.id() != AudioCodegenSessionId::new(session.id()) {
++        bail!(
++            "Higgs Audio codegen session mismatch: input session={}, codegen session={}",
++            session.id(),
++            codegen.id().get()
++        );
++    }
++    Ok(())
++}
++
+ fn load_qwen3_executor(
+     model_dir: &Path,
+     source: HiggsRuntimeSource<'_>,
+@@ -256,3 +449,117 @@ fn path_str<'a>(path: &'a Path, label: &str) -> Result<&'a str> {
+     path.to_str()
+         .with_context(|| format!("{label} must be valid UTF-8"))
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::one_step_golden::CODEBOOK_VOCAB_SIZE;
++    use crate::one_step_golden::HIDDEN_SIZE;
++    use crate::one_step_golden::NUM_CODEBOOKS;
++
++    fn seeded_prefill(session_id: u64, prompt_tokens: usize) -> HiggsPromptSessionPrefill {
++        let mut logits = vec![0.0f32; NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE];
++        for codebook in 0..NUM_CODEBOOKS {
++            logits[codebook * CODEBOOK_VOCAB_SIZE + codebook] = 1.0;
++        }
++        HiggsPromptSessionPrefill {
++            session: HiggsPromptSession::new(session_id),
++            prompt_tokens,
++            final_hidden_bf16: vec![bf16::from_f32(0.0); HIDDEN_SIZE],
++            audio: OneStepAudioPrediction::from_logits(logits),
++        }
++    }
++
++    #[test]
++    fn prompt_prefill_seed_can_start_audio_codegen_trace() {
++        let prefill = seeded_prefill(7, 16);
++        let codegen = prefill.into_audio_codegen_session().unwrap();
++
++        assert_eq!(codegen.prompt_tokens(), 16);
++        assert_eq!(codegen.steps(), 1);
++        assert_eq!(codegen.trace().steps[0].sampled_codes[0], 0);
++        assert_eq!(codegen.delayed_codes().len(), 1);
++    }
++
++    #[test]
++    fn codegen_seed_keeps_higgs_session_with_seeded_trace() {
++        let prefill = seeded_prefill(11, 32);
++        let session = prefill.session;
++        let seed = HiggsAudioCodegenSeed {
++            session,
++            codegen: prefill.into_audio_codegen_session().unwrap(),
++        };
++
++        assert_eq!(seed.session.id(), 11);
++        assert_eq!(seed.codegen.prompt_tokens(), 32);
++        assert_eq!(seed.codegen.steps(), 1);
++    }
++
++    #[test]
++    fn continuation_entry_rejects_wrong_codegen_session_before_executor() {
++        let prefill = seeded_prefill(13, 32);
++        let codegen = prefill.into_audio_codegen_session().unwrap();
++
++        let err = validate_continuation_input(HiggsPromptSession::new(14), HIDDEN_SIZE, &codegen)
++            .unwrap_err()
++            .to_string();
++
++        assert!(err.contains("codegen session mismatch"));
++    }
++
++    #[test]
++    fn continuation_entry_rejects_wrong_feedback_embedding_len_before_executor() {
++        let prefill = seeded_prefill(15, 32);
++        let codegen = prefill.into_audio_codegen_session().unwrap();
++
++        let err =
++            validate_continuation_input(HiggsPromptSession::new(15), HIDDEN_SIZE - 1, &codegen)
++                .unwrap_err()
++                .to_string();
++
++        assert!(err.contains("feedback embedding len mismatch"));
++    }
++
++    #[test]
++    fn runtime_can_push_hidden_step_after_backend_returns_final_hidden() {
++        let prefill = seeded_prefill(19, 32);
++        let mut codegen = prefill.into_audio_codegen_session().unwrap();
++        let mut audio_head =
++            vec![bf16::from_f32(0.0); NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE];
++        for codebook in 0..NUM_CODEBOOKS {
++            let code = 30 + codebook as u32;
++            let row = codebook * CODEBOOK_VOCAB_SIZE + code as usize;
++            audio_head[row * HIDDEN_SIZE] = bf16::from_f32(1.0);
++        }
++
++        let step = push_audio_codegen_hidden_step_with_head(
++            HiggsPromptSession::new(19),
++            &mut codegen,
++            &vec![bf16::from_f32(1.0); HIDDEN_SIZE],
++            &audio_head,
++        )
++        .unwrap();
++
++        assert_eq!(step.sampled_codes, vec![30, 31, 32, 33, 34, 35, 36, 37]);
++        assert_eq!(codegen.trace().steps.len(), 2);
++    }
++
++    #[test]
++    fn runtime_rejects_hidden_step_for_wrong_codegen_session() {
++        let prefill = seeded_prefill(20, 32);
++        let mut codegen = prefill.into_audio_codegen_session().unwrap();
++        let audio_head =
++            vec![bf16::from_f32(0.0); NUM_CODEBOOKS * CODEBOOK_VOCAB_SIZE * HIDDEN_SIZE];
++
++        let err = push_audio_codegen_hidden_step_with_head(
++            HiggsPromptSession::new(21),
++            &mut codegen,
++            &vec![bf16::from_f32(1.0); HIDDEN_SIZE],
++            &audio_head,
++        )
++        .unwrap_err()
++        .to_string();
++
++        assert!(err.contains("codegen session mismatch"));
++    }
++}
+diff --git a/pegainfer-kernels/Cargo.toml b/pegainfer-kernels/Cargo.toml
+index f91c19b6..027c726d 100644
+--- a/pegainfer-kernels/Cargo.toml
++++ b/pegainfer-kernels/Cargo.toml
+@@ -22,6 +22,7 @@ tvm-ffi-triton-cubin = ["dep:tvm-ffi", "qwen35"]
+ # Qwen3.5 Triton AOT kernels (GDR chunkwise prefill) — the only feature that
+ # needs Python + Triton at build time.
+ deepseek-v2-lite = []
++higgs-audio = []
+ qwen35 = []
+ # Shared MoE/MLA third-party substrate: DeepEP, DeepGEMM, and FlashMLA.
+ glm52 = ["moe"]
+diff --git a/pegainfer-kernels/build.rs b/pegainfer-kernels/build.rs
+index f2458b07..7920f551 100644
+--- a/pegainfer-kernels/build.rs
++++ b/pegainfer-kernels/build.rs
+@@ -692,6 +692,15 @@ fn is_glm52_source(csrc_dir: &Path, path: &Path) -> bool {
+     }
+ }
+ 
++fn is_higgs_audio_source(csrc_dir: &Path, path: &Path) -> bool {
++    match path.strip_prefix(csrc_dir) {
++        Ok(relative) => relative
++            .components()
++            .any(|part| part.as_os_str() == "higgs_audio"),
++        Err(_) => false,
++    }
++}
++
+ fn require_submodule_file(root: &Path, feature: &str, label: &str, relative: &str) {
+     let path = root.join(relative);
+     assert!(
+@@ -1416,6 +1425,7 @@ fn main() {
+     let deepseek_v2_lite_enabled = cfg!(feature = "deepseek-v2-lite");
+     let moe_enabled = cfg!(feature = "moe");
+     let glm52_enabled = cfg!(feature = "glm52");
++    let higgs_audio_enabled = cfg!(feature = "higgs-audio");
+     let kimi_k2_enabled = cfg!(feature = "kimi-k2");
+     let qwen35_enabled = cfg!(feature = "qwen35");
+     if glm52_enabled {
+@@ -1470,6 +1480,9 @@ fn main() {
+             if !glm52_enabled && is_glm52_source(&csrc_dir, path) {
+                 return None;
+             }
++            if !higgs_audio_enabled && is_higgs_audio_source(&csrc_dir, path) {
++                return None;
++            }
+             if !kimi_k2_enabled && is_kimi_k2_source(&csrc_dir, path) {
+                 return None;
+             }
+@@ -1747,6 +1760,8 @@ fn main() {
+             ]);
+         } else if stem.starts_with("glm52_") {
+             nvcc_args.extend(["--std=c++17".to_string()]);
++        } else if stem.starts_with("higgs_") {
++            nvcc_args.extend(["--std=c++17".to_string()]);
+         }
+ 
+         nvcc_tasks.push(NvccTask {
+@@ -1766,6 +1781,11 @@ fn main() {
+             "cargo:warning=GLM5.2 DeepGEMM/FlashMLA interfaces disabled; enable the pegainfer-kernels `glm52` feature to build them"
+         );
+     }
++    if !higgs_audio_enabled {
++        println!(
++            "cargo:warning=Higgs-Audio CUDA kernels disabled; enable the pegainfer-kernels `higgs-audio` feature to build them"
++        );
++    }
+     if !kimi_k2_enabled {
+         println!(
+             "cargo:warning=Kimi-K2 CUDA kernels disabled; enable the pegainfer-kernels `kimi-k2` feature to build them"
+diff --git a/pegainfer-kernels/src/ffi.rs b/pegainfer-kernels/src/ffi.rs
+index 7f15467f..9f499350 100644
+--- a/pegainfer-kernels/src/ffi.rs
++++ b/pegainfer-kernels/src/ffi.rs
+@@ -10,6 +10,8 @@ mod deepep;
+ mod deepseek_v2_lite;
+ #[cfg(feature = "glm52")]
+ mod glm52;
++#[cfg(feature = "higgs-audio")]
++mod higgs_audio;
+ #[cfg(feature = "kimi-k2")]
+ mod kimi;
+ mod lora;
+@@ -21,6 +23,8 @@ pub use deepep::*;
+ pub use deepseek_v2_lite::*;
+ #[cfg(feature = "glm52")]
+ pub use glm52::*;
++#[cfg(feature = "higgs-audio")]
++pub use higgs_audio::*;
+ #[cfg(feature = "kimi-k2")]
+ pub use kimi::*;
+ pub use lora::*;
+diff --git a/pegainfer-kernels/src/ops.rs b/pegainfer-kernels/src/ops.rs
+index 0cb31ac7..f6563575 100644
+--- a/pegainfer-kernels/src/ops.rs
++++ b/pegainfer-kernels/src/ops.rs
+@@ -9,6 +9,8 @@ mod elementwise;
+ mod embedding;
+ #[cfg(feature = "glm52")]
+ mod glm52;
++#[cfg(feature = "higgs-audio")]
++mod higgs_audio;
+ #[cfg(feature = "kimi-k2")]
+ mod kimi_k2;
+ mod linear;
+@@ -105,6 +107,8 @@ pub use embedding::embedding_decode_into;
+ pub use embedding::embedding_rows_into;
+ #[cfg(feature = "glm52")]
+ pub use glm52::*;
++#[cfg(feature = "higgs-audio")]
++pub use higgs_audio::*;
+ #[cfg(feature = "kimi-k2")]
+ pub use kimi_k2::*;
+ pub use linear::GEMM_LT_MAX_N;
+diff --git a/pegainfer-kernels/third_party/DeepGEMM b/pegainfer-kernels/third_party/DeepGEMM
+index ecbbe747..559d79fb 160000
+--- a/pegainfer-kernels/third_party/DeepGEMM
++++ b/pegainfer-kernels/third_party/DeepGEMM
+@@ -1 +1 @@
+-Subproject commit ecbbe74779baa587750d1c66aa3370243f4a775e
++Subproject commit 559d79fb6994a58b8a15b4b93bf13ccc16edf247-dirty
+diff --git a/pegainfer-kernels/third_party/FlashMLA b/pegainfer-kernels/third_party/FlashMLA
+index 9241ae3e..15f13e50 160000
+--- a/pegainfer-kernels/third_party/FlashMLA
++++ b/pegainfer-kernels/third_party/FlashMLA
+@@ -1 +1 @@
+-Subproject commit 9241ae3ef9bac614dd25e45e507e089f888280e0
++Subproject commit 15f13e5030374295491c5ce31b02d7e63a7772c6-dirty
+diff --git a/pegainfer-kernels/third_party/flashinfer b/pegainfer-kernels/third_party/flashinfer
+index 19f1a41e..53a1c3bd 160000
+--- a/pegainfer-kernels/third_party/flashinfer
++++ b/pegainfer-kernels/third_party/flashinfer
+@@ -1 +1 @@
+-Subproject commit 19f1a41e6b21f0c422d775e377b6fdf9a1fc9d23
++Subproject commit 53a1c3bd7a3f384d3a8fd1261cc99d80bcf9d188-dirty
+diff --git a/pegainfer-qwen3/src/batch_decode.rs b/pegainfer-qwen3/src/batch_decode.rs
+index a63b3047..de709812 100644
+--- a/pegainfer-qwen3/src/batch_decode.rs
++++ b/pegainfer-qwen3/src/batch_decode.rs
+@@ -181,6 +181,60 @@ impl Qwen3Model {
+         Ok(())
+     }
+ 
++    /// Diagnostic retained decode step that consumes an already-materialized
++    /// input embedding and returns the final normed hidden state before
++    /// `lm_head`.
++    ///
++    /// This intentionally runs eager: the host-to-device embedding copy is a
++    /// diagnostic/runtime-bridge surface, not part of the captured text-token
++    /// serving graph.
++    pub(crate) fn batch_decode_embedding_last_hidden(
++        &self,
++        input_embedding_bf16: &[bf16],
++        kv_view: &KvView,
++        kv_buffer: &CudaSlice<bf16>,
++        layout: &KvLayout,
++        bufs: &mut BatchDecodeBuffers,
++    ) -> Result<Vec<bf16>> {
++        anyhow::ensure!(
++            input_embedding_bf16.len() == self.config().hidden_size,
++            "decode input embedding len mismatch: expected {}, got {}",
++            self.config().hidden_size,
++            input_embedding_bf16.len()
++        );
++        assert_eq!(
++            pegainfer_kernels::ops::numeric_policy(),
++            bufs.policy_at_construction,
++            "NumericPolicy changed after executor construction (policy-key-trap); build a fresh executor per policy"
++        );
++
++        let padded_bs = 1;
++        bufs.set_batch_size(padded_bs);
++
++        let positions = [(kv_view.seq_len() - 1) as i32];
++        self.ctx
++            .stream
++            .memcpy_htod(input_embedding_bf16, &mut bufs.hidden.data)?;
++        self.ctx
++            .stream
++            .memcpy_htod(&positions, &mut bufs.positions_d)?;
++
++        let kv_refs = [kv_view];
++        bufs.sync_paged_meta(&self.ctx, &kv_refs, padded_bs)?;
++        crate::green_ctx::fence_producers_before_override(&self.ctx)?;
++        let attention_path =
++            BatchDecodeBuffers::attention_path(padded_bs, bufs.policy_at_construction);
++        self.batch_decode_body_kernels(kv_buffer, layout, padded_bs, attention_path, false, bufs)?;
++
++        let host = self
++            .ctx
++            .stream
++            .clone_dtoh(&bufs.normed.data)
++            .map_err(|e| anyhow::anyhow!("D2H decode final hidden copy failed: {e}"))?;
++        self.ctx.sync()?;
++        Ok(host[..self.config().hidden_size].to_vec())
++    }
++
+     fn batch_decode_kernels(
+         &self,
+         kv_buffer: &cudarc::driver::CudaSlice<half::bf16>,
+@@ -190,12 +244,36 @@ impl Qwen3Model {
+         use_lora: bool,
+         bufs: &mut BatchDecodeBuffers,
+     ) -> Result<()> {
+-        let num_layers = self.layers.len();
+         let dag = BatchDecodeDag::new(self, kv_buffer, layout, bs, attention_path);
+ 
+         // Embedding: N token_ids → hidden [hidden_dim, bs]
+         dag.embedding(dag_label!("embedding"), &bufs.token_ids_d, &mut bufs.hidden)?;
+ 
++        self.batch_decode_body_kernels(kv_buffer, layout, bs, attention_path, use_lora, bufs)?;
++
++        // Output projection: logits [vocab_size, bs]
++        dag.lm_head(
++            dag_label!("lm_head"),
++            self.output_projection(),
++            &bufs.normed,
++            &mut bufs.logits,
++        );
++
++        Ok(())
++    }
++
++    fn batch_decode_body_kernels(
++        &self,
++        kv_buffer: &cudarc::driver::CudaSlice<half::bf16>,
++        layout: &KvLayout,
++        bs: usize,
++        attention_path: DecodeAttentionPath,
++        use_lora: bool,
++        bufs: &mut BatchDecodeBuffers,
++    ) -> Result<()> {
++        let num_layers = self.layers.len();
++        let dag = BatchDecodeDag::new(self, kv_buffer, layout, bs, attention_path);
++
+         // First layer norm
+         dag.rms_norm(
+             dag_label!("input.rms_norm"),
+@@ -236,14 +314,6 @@ impl Qwen3Model {
+             )?;
+         }
+ 
+-        // Output projection: logits [vocab_size, bs]
+-        dag.lm_head(
+-            dag_label!("lm_head"),
+-            self.output_projection(),
+-            &bufs.normed,
+-            &mut bufs.logits,
+-        );
+-
+         Ok(())
+     }
+ 
+diff --git a/pegainfer-qwen3/src/executor.rs b/pegainfer-qwen3/src/executor.rs
+index 30c0178a..46f93dd4 100644
+--- a/pegainfer-qwen3/src/executor.rs
++++ b/pegainfer-qwen3/src/executor.rs
+@@ -74,11 +74,13 @@ impl RequestId {
+         Self(value)
+     }
+ 
+-    pub(crate) fn get(self) -> u64 {
++    pub fn get(self) -> u64 {
+         self.0
+     }
+ }
+ 
++const EMBEDDING_DECODE_BOOKKEEPING_TOKEN: u32 = 0;
++
+ #[derive(Clone)]
+ pub struct PrefillStepItem {
+     pub(crate) request_id: RequestId,
+@@ -449,6 +451,24 @@ fn execute_step_on_lane(
+                 Ok(WorkerStepOutcome::Ack)
+             }
+         }
++        StepCommand::DecodeEmbeddingLastHidden {
++            request_id,
++            input_embedding_bf16,
++            kv_view,
++        } => {
++            let hidden =
++                lane.execute_decode_embedding_last_hidden(input_embedding_bf16, kv_view)?;
++            if collect_result {
++                Ok(WorkerStepOutcome::RetainedEmbeddingDecodeHidden(
++                    RetainedEmbeddingDecodeHiddenResult {
++                        request_id: *request_id,
++                        hidden_bf16: hidden,
++                    },
++                ))
++            } else {
++                Ok(WorkerStepOutcome::Ack)
++            }
++        }
+         StepCommand::PrefillLayerHidden { prompt, kv_view } => {
+             let hidden = lane.execute_prefill_layer_hidden(prompt, kv_view)?;
+             if collect_result {
+@@ -873,6 +893,12 @@ pub struct RetainedPrefillHiddenResult {
+     pub hidden_bf16: Vec<half::bf16>,
+ }
+ 
++#[derive(Clone, Debug)]
++pub struct RetainedEmbeddingDecodeHiddenResult {
++    pub request_id: RequestId,
++    pub hidden_bf16: Vec<half::bf16>,
++}
++
+ #[derive(Clone, Debug)]
+ pub struct PrefillLayerHiddenResult {
+     pub embedding_hidden_bf16: Vec<half::bf16>,
+@@ -1662,14 +1688,30 @@ impl Qwen3Executor {
+         &mut self,
+         request_id: RequestId,
+         prompt: Vec<u32>,
++    ) -> Result<RetainedPrefillHiddenResult> {
++        self.prefill_last_hidden_bf16_retained_prompt_with_max_output_tokens(request_id, prompt, 1)
++    }
++
++    pub fn prefill_last_hidden_bf16_retained_prompt_with_max_output_tokens(
++        &mut self,
++        request_id: RequestId,
++        prompt: Vec<u32>,
++        max_output_tokens: usize,
+     ) -> Result<RetainedPrefillHiddenResult> {
+         self.ensure_single_rank_diagnostic("prefill_last_hidden_bf16_retained_prompt")?;
++        anyhow::ensure!(
++            max_output_tokens > 0,
++            "retained diagnostic max_output_tokens must be greater than zero"
++        );
+         anyhow::ensure!(
+             !self.request_kvs.contains_key(&request_id),
+             "request {:?} already exists",
+             request_id
+         );
+-        let mut rkv = self.kv_mgr.pool().new_request(prompt.clone(), 1, None);
++        let mut rkv = self
++            .kv_mgr
++            .pool()
++            .new_request(prompt.clone(), max_output_tokens, None);
+         rkv.schedule_prefill(prompt.len(), self.kv_mgr.pool())
+             .map_err(|e| anyhow::anyhow!("diagnostic retained prefill schedule failed: {e}"))?;
+         let kv_view = rkv.prefill_view(prompt.len());
+@@ -1683,7 +1725,11 @@ impl Qwen3Executor {
+                 ));
+             }
+         };
+-        rkv.apply_prefill_chunk(self.kv_mgr.pool())?;
++        // The hidden-returning diagnostic path does not sample a text token,
++        // but the KV sequence still needs the final prefill step to create the
++        // same one-token dangling decode ledger as normal Qwen3 prefill. The
++        // embedding-fed continuation path ignores this token as model input.
++        rkv.apply_prefill(EMBEDDING_DECODE_BOOKKEEPING_TOKEN, self.kv_mgr.pool())?;
+         self.request_kvs.insert(request_id, rkv);
+         Ok(RetainedPrefillHiddenResult {
+             request_id,
+@@ -1691,6 +1737,75 @@ impl Qwen3Executor {
+         })
+     }
+ 
++    /// Diagnostic retained decode step for embedding-fed continuations.
++    ///
++    /// This is intentionally narrow for multimodal bridge bring-up: it consumes
++    /// a caller-owned input embedding, advances the retained KV sequence by one
++    /// step, and returns the final normed hidden before Qwen3's text `lm_head`.
++    /// The bookkeeping token only advances the retained sequence ledger and is
++    /// not used as the model input.
++    pub fn decode_embedding_last_hidden_bf16_retained(
++        &mut self,
++        request_id: RequestId,
++        input_embedding_bf16: Vec<half::bf16>,
++    ) -> Result<RetainedEmbeddingDecodeHiddenResult> {
++        self.ensure_single_rank_diagnostic("decode_embedding_last_hidden_bf16_retained")?;
++        anyhow::ensure!(
++            input_embedding_bf16.len() == self.metadata.config.hidden_size,
++            "decode input embedding len mismatch: expected {}, got {}",
++            self.metadata.config.hidden_size,
++            input_embedding_bf16.len()
++        );
++
++        let rkv = self
++            .request_kvs
++            .get_mut(&request_id)
++            .ok_or_else(|| anyhow::anyhow!("missing retained RequestKv for {:?}", request_id))?;
++        rkv.schedule_decode(self.kv_mgr.pool())
++            .map_err(|e| anyhow::anyhow!("schedule retained embedding decode failed: {e}"))?;
++        let kv_view = rkv.decode_view();
++
++        let outcome = match self.run_step(&StepCommand::DecodeEmbeddingLastHidden {
++            request_id,
++            input_embedding_bf16,
++            kv_view,
++        }) {
++            Ok(outcome) => outcome,
++            Err(err) => {
++                let rkv = self
++                    .request_kvs
++                    .get_mut(&request_id)
++                    .expect("retained request must exist after failed embedding decode");
++                rkv.revert_schedule()?;
++                return Err(err);
++            }
++        };
++        let result = match outcome {
++            WorkerStepOutcome::RetainedEmbeddingDecodeHidden(result) => result,
++            other => {
++                let rkv = self
++                    .request_kvs
++                    .get_mut(&request_id)
++                    .expect("retained request must exist after unexpected embedding decode");
++                rkv.revert_schedule()?;
++                return Err(anyhow::anyhow!(
++                    "retained embedding decode hidden returned unexpected: {}",
++                    other.kind()
++                ));
++            }
++        };
++
++        let rkv = self
++            .request_kvs
++            .get_mut(&request_id)
++            .expect("retained request must exist after embedding decode");
++        if let Err(err) = rkv.apply_decode(EMBEDDING_DECODE_BOOKKEEPING_TOKEN, self.kv_mgr.pool()) {
++            rkv.revert_schedule()?;
++            return Err(err);
++        }
++        Ok(result)
++    }
++
+     pub fn prefill_layer_hidden_bf16(
+         &mut self,
+         prompt: Vec<u32>,
+@@ -3752,6 +3867,20 @@ impl LocalQwen3Lane {
+         )
+     }
+ 
++    fn execute_decode_embedding_last_hidden(
++        &mut self,
++        input_embedding_bf16: &[half::bf16],
++        kv_view: &KvView,
++    ) -> Result<Vec<half::bf16>> {
++        self.model.batch_decode_embedding_last_hidden(
++            input_embedding_bf16,
++            kv_view,
++            self.kv_buffer.buffer(),
++            &self.layout,
++            &mut self.bufs,
++        )
++    }
++
+     fn execute_unified(
+         &mut self,
+         prefill_prompts: &[&[u32]],
+@@ -3812,6 +3941,11 @@ enum StepCommand {
+         prompt: Vec<u32>,
+         kv_view: KvView,
+     },
++    DecodeEmbeddingLastHidden {
++        request_id: RequestId,
++        input_embedding_bf16: Vec<half::bf16>,
++        kv_view: KvView,
++    },
+     PrefillLayerHidden {
+         prompt: Vec<u32>,
+         kv_view: KvView,
+@@ -3862,6 +3996,7 @@ impl StepCommand {
+             Self::Prefill { .. } => "prefill",
+             Self::Decode { .. } => "decode",
+             Self::PrefillLastHidden { .. } => "prefill_hidden",
++            Self::DecodeEmbeddingLastHidden { .. } => "decode_embedding_hidden",
+             Self::PrefillLayerHidden { .. } => "prefill_layer_hidden",
+             Self::PrefillLayerStages { .. } => "prefill_layer_stages",
+             Self::Unified { .. } => "unified",
+@@ -3948,6 +4083,7 @@ enum WorkerStepOutcome {
+     Decode(DecodeResult),
+     Unified(UnifiedResult),
+     PrefillHidden(PrefillHiddenResult),
++    RetainedEmbeddingDecodeHidden(RetainedEmbeddingDecodeHiddenResult),
+     PrefillLayerHidden(PrefillLayerHiddenResult),
+     PrefillStages(PrefillStageResult),
+     /// Split-concurrent: decode result is ready; prefill is still in-flight
+@@ -3971,6 +4107,7 @@ impl WorkerStepOutcome {
+             Self::Decode(_) => "decode",
+             Self::Unified(_) => "unified",
+             Self::PrefillHidden(_) => "prefill_hidden",
++            Self::RetainedEmbeddingDecodeHidden(_) => "decode_embedding_hidden",
+             Self::PrefillLayerHidden(_) => "prefill_layer_hidden",
+             Self::PrefillStages(_) => "prefill_layer_stages",
+             Self::SplitDecodeReady { .. } => "split_decode_ready",
+diff --git a/pegainfer-qwen3/src/lib.rs b/pegainfer-qwen3/src/lib.rs
+index 4d3ea56f..6d68cee0 100644
+--- a/pegainfer-qwen3/src/lib.rs
++++ b/pegainfer-qwen3/src/lib.rs
+@@ -212,6 +212,7 @@ pub mod runtime {
+     pub use crate::executor::PrefillStepItem;
+     pub use crate::executor::Qwen3Executor;
+     pub use crate::executor::RequestId;
++    pub use crate::executor::RetainedEmbeddingDecodeHiddenResult;
+     pub use crate::executor::RetainedPrefillHiddenResult;
+     pub use crate::executor::UnifiedPlan;
+     pub use crate::executor::UnifiedResult;
+diff --git a/pegainfer-server/Cargo.toml b/pegainfer-server/Cargo.toml
+index e3051470..2f755ec4 100644
+--- a/pegainfer-server/Cargo.toml
++++ b/pegainfer-server/Cargo.toml
+@@ -19,6 +19,7 @@ pegainfer-deepseek-v2-lite = { workspace = true, optional = true }
+ pegainfer-frontend = { workspace = true }
+ pegainfer-gemma4 = { workspace = true, optional = true }
+ pegainfer-glm52 = { workspace = true, optional = true }
++pegainfer-higgs-audio = { workspace = true, optional = true }
+ pegainfer-kimi-k2 = { workspace = true, optional = true }
+ pegainfer-qwen3 = { workspace = true, optional = true }
+ pegainfer-qwen35 = { workspace = true, optional = true }
+@@ -40,6 +41,7 @@ deepseek-v2-lite = [
+ ]
+ gemma4 = ["dep:pegainfer-gemma4", "pegainfer-gemma4/gemma4"]
+ glm52 = ["dep:pegainfer-glm52"]
++higgs-audio = ["dep:pegainfer-higgs-audio", "pegainfer-higgs-audio/server-line"]
+ kimi-k2 = ["dep:pegainfer-kimi-k2", "pegainfer-kimi-k2/kimi-k2"]
+ qwen35 = ["dep:pegainfer-qwen35", "pegainfer-qwen35/qwen35"]
+ 
+diff --git a/pegainfer-server/src/main.rs b/pegainfer-server/src/main.rs
+index ebe86129..69739b0d 100644
+--- a/pegainfer-server/src/main.rs
++++ b/pegainfer-server/src/main.rs
+@@ -29,6 +29,8 @@ fn model_lines() -> Vec<&'static dyn ModelLine> {
+         &pegainfer_gemma4::model_line::MODEL_LINE,
+         #[cfg(feature = "glm52")]
+         &pegainfer_glm52::model_line::MODEL_LINE,
++        #[cfg(feature = "higgs-audio")]
++        &pegainfer_higgs_audio::model_line::MODEL_LINE,
+         #[cfg(feature = "kimi-k2")]
+         &pegainfer_kimi_k2::model_line::MODEL_LINE,
+         #[cfg(feature = "qwen3")]
+@@ -79,6 +81,12 @@ fn feature_gate_hint(config: &serde_json::Value) -> Option<String> {
+             text_model_types: &[],
+             compiled: cfg!(feature = "glm52"),
+         },
++        Family {
++            feature: "higgs-audio",
++            model_types: &["higgs_multimodal_qwen3"],
++            text_model_types: &[],
++            compiled: cfg!(feature = "higgs-audio"),
++        },
+         Family {
+             feature: "kimi-k2",
+             model_types: &["kimi_k25", "kimi_k2"],

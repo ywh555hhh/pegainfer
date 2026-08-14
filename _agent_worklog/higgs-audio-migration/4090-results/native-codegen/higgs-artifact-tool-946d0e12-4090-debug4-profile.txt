@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running `target/release/higgs_prepare_codegen_artifacts --sampled-codes-json /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-sampled-946d0e12-4090-debug4-profile.json --prompt-tokens 12 --trace-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-trace-946d0e12-4090-debug4-profile.json --codec-input-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-codec-input-946d0e12-4090-debug4-profile.json`
+higgs prepare codegen artifacts: ok
+  sampled_codes_json: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-sampled-946d0e12-4090-debug4-profile.json
+  prompt_tokens: 12
+  steps: 8
+  raw_codec_rows: 1
+  trace_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-trace-946d0e12-4090-debug4-profile.json
+  codec_input_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-codec-input-946d0e12-4090-debug4-profile.json

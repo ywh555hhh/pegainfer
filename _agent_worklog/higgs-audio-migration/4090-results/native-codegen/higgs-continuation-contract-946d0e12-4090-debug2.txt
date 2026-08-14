@@ -1,0 +1,28 @@
+   Compiling serde_core v1.0.228
+   Compiling num-traits v0.2.19
+   Compiling serde_json v1.0.149
+   Compiling serde v1.0.228
+   Compiling syn v2.0.117
+   Compiling libc v0.2.186
+   Compiling memchr v2.8.0
+   Compiling memmap2 v0.9.10
+   Compiling zerocopy-derive v0.8.48
+   Compiling serde_derive v1.0.228
+   Compiling clap_derive v4.6.1
+   Compiling hashbrown v0.16.1
+   Compiling zerocopy v0.8.48
+   Compiling clap v4.6.1
+   Compiling safetensors v0.7.0
+   Compiling half v2.7.1
+   Compiling pegainfer-higgs-audio v0.1.0 (/data/src/pegainfer/pegainfer-higgs-audio)
+    Finished `release` profile [optimized] target(s) in 9.44s
+     Running `target/release/higgs_continuation_contract_report`
+higgs continuation contract: ok
+  input: feedback_embedding
+  output: final_normed_hidden
+  input_hidden_size: 2560
+  output_hidden_size: 2560
+  codebooks: 8
+  retained_kv: true
+  full_prompt_rebuild: false
+  next_gpu_gate: feedback embedding -> retained-KV body -> final normed hidden

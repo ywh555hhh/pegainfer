@@ -1,0 +1,16 @@
+status=blocked_native_codec_unimplemented
+claim=native_codec_contract_only_no_waveform
+runtime_boundary=Rust+CUDA native code generation and native codec/vocoder skeleton; no Python sidecar
+model_dir=/root/autodl-tmp/models/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561
+golden=/root/autodl-tmp/results/higgs-one-step-sglang-omni-golden-autodl.safetensors
+prompt_tokens=10
+requested_steps=48
+completed_steps=48
+trace_steps=49
+raw_codec_rows=42
+codec_sample_rate=24000
+codec_frame_rate=25
+codec_hop_length=960
+trace_out=/data/results/pegainfer/higgs-audio/native-e2e/higgs-native-e2e-trace-946d0e12-4090-native-e2e-skeleton-v2.json
+strict_parity=not_claimed
+native_codec_decoder_error=Higgs native codec CUDA decoder is not implemented yet; claim boundary is native_codec_contract_only_no_waveform

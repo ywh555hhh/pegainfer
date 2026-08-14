@@ -1,0 +1,28 @@
+{
+  "schema": "higgs-audio-codec-input-v1",
+  "num_codebooks": 8,
+  "codebook_size": 1026,
+  "codec_audio_vocab_size": 1024,
+  "raw_codes": [
+    [
+      244,
+      641,
+      926,
+      584,
+      843,
+      764,
+      405,
+      1021
+    ],
+    [
+      244,
+      776,
+      926,
+      984,
+      133,
+      325,
+      325,
+      409
+    ]
+  ]
+}

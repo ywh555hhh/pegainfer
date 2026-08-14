@@ -1,0 +1,11 @@
+    Finished `release` profile [optimized] target(s) in 0.20s
+     Running `target/release/higgs_continuation_contract_report`
+higgs continuation contract: ok
+  input: feedback_embedding
+  output: final_normed_hidden
+  input_hidden_size: 2560
+  output_hidden_size: 2560
+  codebooks: 8
+  retained_kv: true
+  full_prompt_rebuild: false
+  next_gpu_gate: feedback embedding -> retained-KV body -> final normed hidden

@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized] target(s) in 0.22s
+     Running `target/release/higgs_prepare_codegen_artifacts --sampled-codes-json /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-sampled-local-nogpu-946d0e12.json --prompt-tokens 12 --trace-out /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-trace-local-nogpu-946d0e12.json --codec-input-out /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-codec-input-local-nogpu-946d0e12.json`
+higgs prepare codegen artifacts: ok
+  sampled_codes_json: /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-sampled-local-nogpu-946d0e12.json
+  prompt_tokens: 12
+  steps: 8
+  raw_codec_rows: 1
+  trace_out: /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-trace-local-nogpu-946d0e12.json
+  codec_input_out: /Users/yiweihan/Documents/muxi/higgs-audio-migration/local-gate/native-codegen/higgs-artifact-codec-input-local-nogpu-946d0e12.json

@@ -692,6 +692,15 @@ fn is_glm52_source(csrc_dir: &Path, path: &Path) -> bool {
     }
 }
 
+fn is_higgs_audio_source(csrc_dir: &Path, path: &Path) -> bool {
+    match path.strip_prefix(csrc_dir) {
+        Ok(relative) => relative
+            .components()
+            .any(|part| part.as_os_str() == "higgs_audio"),
+        Err(_) => false,
+    }
+}
+
 fn require_submodule_file(root: &Path, feature: &str, label: &str, relative: &str) {
     let path = root.join(relative);
     assert!(
@@ -1416,6 +1425,7 @@ fn main() {
     let deepseek_v2_lite_enabled = cfg!(feature = "deepseek-v2-lite");
     let moe_enabled = cfg!(feature = "moe");
     let glm52_enabled = cfg!(feature = "glm52");
+    let higgs_audio_enabled = cfg!(feature = "higgs-audio");
     let kimi_k2_enabled = cfg!(feature = "kimi-k2");
     let qwen35_enabled = cfg!(feature = "qwen35");
     if glm52_enabled {
@@ -1468,6 +1478,9 @@ fn main() {
                 return None;
             }
             if !glm52_enabled && is_glm52_source(&csrc_dir, path) {
+                return None;
+            }
+            if !higgs_audio_enabled && is_higgs_audio_source(&csrc_dir, path) {
                 return None;
             }
             if !kimi_k2_enabled && is_kimi_k2_source(&csrc_dir, path) {
@@ -1747,6 +1760,8 @@ fn main() {
             ]);
         } else if stem.starts_with("glm52_") {
             nvcc_args.extend(["--std=c++17".to_string()]);
+        } else if stem.starts_with("higgs_") {
+            nvcc_args.extend(["--std=c++17".to_string()]);
         }
 
         nvcc_tasks.push(NvccTask {
@@ -1764,6 +1779,11 @@ fn main() {
     if !glm52_enabled {
         println!(
             "cargo:warning=GLM5.2 DeepGEMM/FlashMLA interfaces disabled; enable the pegainfer-kernels `glm52` feature to build them"
+        );
+    }
+    if !higgs_audio_enabled {
+        println!(
+            "cargo:warning=Higgs-Audio CUDA kernels disabled; enable the pegainfer-kernels `higgs-audio` feature to build them"
         );
     }
     if !kimi_k2_enabled {

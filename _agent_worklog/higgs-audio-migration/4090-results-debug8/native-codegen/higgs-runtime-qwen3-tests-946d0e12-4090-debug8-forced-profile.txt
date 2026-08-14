@@ -1,0 +1,24 @@
+warning: pegainfer-kernels@0.1.0: Detected CUDA SM targets: sm_89
+warning: pegainfer-kernels@0.1.0: Compiling CUDA kernels for nvcc targets: sm_89
+warning: pegainfer-kernels@0.1.0: Legacy CUDA translation units retired from the runtime build: activation.cu, embedding.cu, fused_attention.cu
+warning: pegainfer-kernels@0.1.0: Compiling CUDA translation units with 8 nvcc job(s)
+warning: pegainfer-kernels@0.1.0: Using FlashInfer include dir: /data/src/pegainfer/pegainfer-kernels/third_party/flashinfer/include
+warning: pegainfer-kernels@0.1.0: MoE third-party substrate disabled; enable the pegainfer-kernels `moe` feature to build DeepEP-backed kernels
+warning: pegainfer-kernels@0.1.0: GLM5.2 DeepGEMM/FlashMLA interfaces disabled; enable the pegainfer-kernels `glm52` feature to build them
+warning: pegainfer-kernels@0.1.0: Kimi-K2 CUDA kernels disabled; enable the pegainfer-kernels `kimi-k2` feature to build them
+warning: pegainfer-kernels@0.1.0: Qwen3.5 Triton AOT kernels disabled; enable the pegainfer-kernels `qwen35` feature to build them (needs Python + Triton at build time)
+    Finished `release` profile [optimized] target(s) in 0.56s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/release/build/pegainfer-higgs-audio/1be4175284def497/out/pegainfer_higgs_audio-1be4175284def497)
+
+running 6 tests
+test runtime_bridge::tests::codegen_seed_keeps_higgs_session_with_seeded_trace ... ok
+test runtime_bridge::tests::continuation_entry_rejects_wrong_codegen_session_before_executor ... ok
+test runtime_bridge::tests::continuation_entry_rejects_wrong_feedback_embedding_len_before_executor ... ok
+test runtime_bridge::tests::prompt_prefill_seed_can_start_audio_codegen_trace ... ok
+test runtime_bridge::tests::runtime_rejects_hidden_step_for_wrong_codegen_session ... ok
+test runtime_bridge::tests::runtime_can_push_hidden_step_after_backend_returns_final_hidden ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 0.03s
+

@@ -1,0 +1,345 @@
+{
+  "prompt_tokens": 12,
+  "schema": "higgs-audio-native-codegen-trace-v1",
+  "steps": [
+    {
+      "delayed_codes": [
+        1,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          1,
+          101,
+          201,
+          301,
+          401,
+          501,
+          601,
+          701
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        1,
+        101,
+        201,
+        301,
+        401,
+        501,
+        601,
+        701
+      ],
+      "step": 0
+    },
+    {
+      "delayed_codes": [
+        2,
+        102,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          2,
+          102,
+          202,
+          302,
+          402,
+          502,
+          602,
+          702
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        2,
+        102,
+        202,
+        302,
+        402,
+        502,
+        602,
+        702
+      ],
+      "step": 1
+    },
+    {
+      "delayed_codes": [
+        3,
+        103,
+        203,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          3,
+          103,
+          203,
+          303,
+          403,
+          503,
+          603,
+          703
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        3,
+        103,
+        203,
+        303,
+        403,
+        503,
+        603,
+        703
+      ],
+      "step": 2
+    },
+    {
+      "delayed_codes": [
+        4,
+        104,
+        204,
+        304,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          4,
+          104,
+          204,
+          304,
+          404,
+          504,
+          604,
+          704
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        4,
+        104,
+        204,
+        304,
+        404,
+        504,
+        604,
+        704
+      ],
+      "step": 3
+    },
+    {
+      "delayed_codes": [
+        5,
+        105,
+        205,
+        305,
+        405,
+        1024,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          5,
+          105,
+          205,
+          305,
+          405,
+          505,
+          605,
+          705
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        5,
+        105,
+        205,
+        305,
+        405,
+        505,
+        605,
+        705
+      ],
+      "step": 4
+    },
+    {
+      "delayed_codes": [
+        6,
+        106,
+        206,
+        306,
+        406,
+        506,
+        1024,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          6,
+          106,
+          206,
+          306,
+          406,
+          506,
+          606,
+          706
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        6,
+        106,
+        206,
+        306,
+        406,
+        506,
+        606,
+        706
+      ],
+      "step": 5
+    },
+    {
+      "delayed_codes": [
+        7,
+        107,
+        207,
+        307,
+        407,
+        507,
+        607,
+        1024
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          7,
+          107,
+          207,
+          307,
+          407,
+          507,
+          607,
+          707
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [],
+      "sampled_codes": [
+        7,
+        107,
+        207,
+        307,
+        407,
+        507,
+        607,
+        707
+      ],
+      "step": 6
+    },
+    {
+      "delayed_codes": [
+        1025,
+        108,
+        208,
+        308,
+        408,
+        508,
+        608,
+        708
+      ],
+      "generation_done": false,
+      "logits": {
+        "argmax": [
+          1025,
+          108,
+          208,
+          308,
+          408,
+          508,
+          608,
+          708
+        ],
+        "logits": null,
+        "logits_l2_norm": 0.0,
+        "top64_min_overlap_with_previous": null,
+        "top_ids": null
+      },
+      "raw_codes": [
+        [
+          1,
+          102,
+          203,
+          304,
+          405,
+          506,
+          607,
+          708
+        ]
+      ],
+      "sampled_codes": [
+        1025,
+        108,
+        208,
+        308,
+        408,
+        508,
+        608,
+        708
+      ],
+      "step": 7
+    }
+  ]
+}

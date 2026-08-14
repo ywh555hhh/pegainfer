@@ -1,0 +1,5 @@
+branch=dev/higgs-audio
+head=946d0e12
+head_full=946d0e121ea9c50450aa1b70648aed5a70e2dccc
+upstream_main=4fdbc3d24609de9e08a297ebb33f8ee611cb9904
+created_at=2026-08-14T07:18:59Z

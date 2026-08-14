@@ -1,0 +1,10 @@
+   Compiling pegainfer-higgs-audio v0.1.0 (/data/src/pegainfer/pegainfer-higgs-audio)
+    Finished `release` profile [optimized] target(s) in 0.96s
+     Running `target/release/higgs_prepare_codegen_artifacts --sampled-codes-json /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-sampled-946d0e12-4090-debug2.json --prompt-tokens 12 --trace-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-trace-946d0e12-4090-debug2.json --codec-input-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-codec-input-946d0e12-4090-debug2.json`
+higgs prepare codegen artifacts: ok
+  sampled_codes_json: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-sampled-946d0e12-4090-debug2.json
+  prompt_tokens: 12
+  steps: 8
+  raw_codec_rows: 1
+  trace_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-trace-946d0e12-4090-debug2.json
+  codec_input_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-artifact-codec-input-946d0e12-4090-debug2.json

@@ -1,0 +1,12 @@
+   Compiling pegainfer-higgs-audio v0.1.0 (/data/src/pegainfer/pegainfer-higgs-audio)
+    Finished `release` profile [optimized] target(s) in 0.83s
+     Running `target/release/higgs_compare_codegen_trace --reference /data/results/pegainfer/higgs-audio/native-codegen/higgs-reference-incremental-trace-946d0e12-4090.json --actual /data/results/pegainfer/higgs-audio/native-codegen/higgs-native-continuation-trace-946d0e12-4090-debug4.json`
+higgs codegen trace comparison:
+  prompt_tokens_match=true steps_compared=9 first_divergent_step=Some(4)
+  sampled_rows_exact=false raw_rows_exact=false generation_done_exact=true
+  argmax_agreement=0.708333 argmax_matches=51/72
+  full_logits_available=true logits_cosine=Some(0.99989086) logits_cosine_min=0.999000
+  logits_max_abs=Some(12.981487) max_tol=0.500000 logits_mean_abs=Some(0.6785689) mean_tol=0.050000 logits_p99_abs=Some(5.54644) p99_tol=0.250000
+  max_argmax_regret=Some(6.75) regret_tol=0.200000
+  topk_available=true topk_min_overlap=Some(10) topk_mean_overlap=Some(49.72222) topk_min_overlap_tol=58
+Error: Higgs codegen trace comparison failed: prompt_tokens_match=true first_divergent_step=Some(4) sampled_rows_exact=false raw_rows_exact=false generation_done_exact=true argmax_agreement=0.708333 full_logits_available=true logits_cosine=Some(0.99989086) logits_max_abs=Some(12.981487) logits_mean_abs=Some(0.6785689) logits_p99_abs=Some(5.54644) max_argmax_regret=Some(6.75) topk_available=true topk_min_overlap=Some(10)

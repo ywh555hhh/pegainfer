@@ -74,10 +74,12 @@ impl RequestId {
         Self(value)
     }
 
-    pub(crate) fn get(self) -> u64 {
+    pub fn get(self) -> u64 {
         self.0
     }
 }
+
+const EMBEDDING_DECODE_BOOKKEEPING_TOKEN: u32 = 0;
 
 #[derive(Clone)]
 pub struct PrefillStepItem {
@@ -445,6 +447,24 @@ fn execute_step_on_lane(
                 Ok(WorkerStepOutcome::PrefillHidden(PrefillHiddenResult {
                     hidden_bf16: hidden,
                 }))
+            } else {
+                Ok(WorkerStepOutcome::Ack)
+            }
+        }
+        StepCommand::DecodeEmbeddingLastHidden {
+            request_id,
+            input_embedding_bf16,
+            kv_view,
+        } => {
+            let hidden =
+                lane.execute_decode_embedding_last_hidden(input_embedding_bf16, kv_view)?;
+            if collect_result {
+                Ok(WorkerStepOutcome::RetainedEmbeddingDecodeHidden(
+                    RetainedEmbeddingDecodeHiddenResult {
+                        request_id: *request_id,
+                        hidden_bf16: hidden,
+                    },
+                ))
             } else {
                 Ok(WorkerStepOutcome::Ack)
             }
@@ -869,6 +889,12 @@ pub struct PrefillHiddenResult {
 
 #[derive(Clone, Debug)]
 pub struct RetainedPrefillHiddenResult {
+    pub request_id: RequestId,
+    pub hidden_bf16: Vec<half::bf16>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RetainedEmbeddingDecodeHiddenResult {
     pub request_id: RequestId,
     pub hidden_bf16: Vec<half::bf16>,
 }
@@ -1663,13 +1689,29 @@ impl Qwen3Executor {
         request_id: RequestId,
         prompt: Vec<u32>,
     ) -> Result<RetainedPrefillHiddenResult> {
+        self.prefill_last_hidden_bf16_retained_prompt_with_max_output_tokens(request_id, prompt, 1)
+    }
+
+    pub fn prefill_last_hidden_bf16_retained_prompt_with_max_output_tokens(
+        &mut self,
+        request_id: RequestId,
+        prompt: Vec<u32>,
+        max_output_tokens: usize,
+    ) -> Result<RetainedPrefillHiddenResult> {
         self.ensure_single_rank_diagnostic("prefill_last_hidden_bf16_retained_prompt")?;
+        anyhow::ensure!(
+            max_output_tokens > 0,
+            "retained diagnostic max_output_tokens must be greater than zero"
+        );
         anyhow::ensure!(
             !self.request_kvs.contains_key(&request_id),
             "request {:?} already exists",
             request_id
         );
-        let mut rkv = self.kv_mgr.pool().new_request(prompt.clone(), 1, None);
+        let mut rkv = self
+            .kv_mgr
+            .pool()
+            .new_request(prompt.clone(), max_output_tokens, None);
         rkv.schedule_prefill(prompt.len(), self.kv_mgr.pool())
             .map_err(|e| anyhow::anyhow!("diagnostic retained prefill schedule failed: {e}"))?;
         let kv_view = rkv.prefill_view(prompt.len());
@@ -1683,12 +1725,85 @@ impl Qwen3Executor {
                 ));
             }
         };
-        rkv.apply_prefill_chunk(self.kv_mgr.pool())?;
+        // The hidden-returning diagnostic path does not sample a text token,
+        // but the KV sequence still needs the final prefill step to create the
+        // same one-token dangling decode ledger as normal Qwen3 prefill. The
+        // embedding-fed continuation path ignores this token as model input.
+        rkv.apply_prefill(EMBEDDING_DECODE_BOOKKEEPING_TOKEN, self.kv_mgr.pool())?;
         self.request_kvs.insert(request_id, rkv);
         Ok(RetainedPrefillHiddenResult {
             request_id,
             hidden_bf16: result.hidden_bf16,
         })
+    }
+
+    /// Diagnostic retained decode step for embedding-fed continuations.
+    ///
+    /// This is intentionally narrow for multimodal bridge bring-up: it consumes
+    /// a caller-owned input embedding, advances the retained KV sequence by one
+    /// step, and returns the final normed hidden before Qwen3's text `lm_head`.
+    /// The bookkeeping token only advances the retained sequence ledger and is
+    /// not used as the model input.
+    pub fn decode_embedding_last_hidden_bf16_retained(
+        &mut self,
+        request_id: RequestId,
+        input_embedding_bf16: Vec<half::bf16>,
+    ) -> Result<RetainedEmbeddingDecodeHiddenResult> {
+        self.ensure_single_rank_diagnostic("decode_embedding_last_hidden_bf16_retained")?;
+        anyhow::ensure!(
+            input_embedding_bf16.len() == self.metadata.config.hidden_size,
+            "decode input embedding len mismatch: expected {}, got {}",
+            self.metadata.config.hidden_size,
+            input_embedding_bf16.len()
+        );
+
+        let rkv = self
+            .request_kvs
+            .get_mut(&request_id)
+            .ok_or_else(|| anyhow::anyhow!("missing retained RequestKv for {:?}", request_id))?;
+        rkv.schedule_decode(self.kv_mgr.pool())
+            .map_err(|e| anyhow::anyhow!("schedule retained embedding decode failed: {e}"))?;
+        let kv_view = rkv.decode_view();
+
+        let outcome = match self.run_step(&StepCommand::DecodeEmbeddingLastHidden {
+            request_id,
+            input_embedding_bf16,
+            kv_view,
+        }) {
+            Ok(outcome) => outcome,
+            Err(err) => {
+                let rkv = self
+                    .request_kvs
+                    .get_mut(&request_id)
+                    .expect("retained request must exist after failed embedding decode");
+                rkv.revert_schedule()?;
+                return Err(err);
+            }
+        };
+        let result = match outcome {
+            WorkerStepOutcome::RetainedEmbeddingDecodeHidden(result) => result,
+            other => {
+                let rkv = self
+                    .request_kvs
+                    .get_mut(&request_id)
+                    .expect("retained request must exist after unexpected embedding decode");
+                rkv.revert_schedule()?;
+                return Err(anyhow::anyhow!(
+                    "retained embedding decode hidden returned unexpected: {}",
+                    other.kind()
+                ));
+            }
+        };
+
+        let rkv = self
+            .request_kvs
+            .get_mut(&request_id)
+            .expect("retained request must exist after embedding decode");
+        if let Err(err) = rkv.apply_decode(EMBEDDING_DECODE_BOOKKEEPING_TOKEN, self.kv_mgr.pool()) {
+            rkv.revert_schedule()?;
+            return Err(err);
+        }
+        Ok(result)
     }
 
     pub fn prefill_layer_hidden_bf16(
@@ -3752,6 +3867,20 @@ impl LocalQwen3Lane {
         )
     }
 
+    fn execute_decode_embedding_last_hidden(
+        &mut self,
+        input_embedding_bf16: &[half::bf16],
+        kv_view: &KvView,
+    ) -> Result<Vec<half::bf16>> {
+        self.model.batch_decode_embedding_last_hidden(
+            input_embedding_bf16,
+            kv_view,
+            self.kv_buffer.buffer(),
+            &self.layout,
+            &mut self.bufs,
+        )
+    }
+
     fn execute_unified(
         &mut self,
         prefill_prompts: &[&[u32]],
@@ -3812,6 +3941,11 @@ enum StepCommand {
         prompt: Vec<u32>,
         kv_view: KvView,
     },
+    DecodeEmbeddingLastHidden {
+        request_id: RequestId,
+        input_embedding_bf16: Vec<half::bf16>,
+        kv_view: KvView,
+    },
     PrefillLayerHidden {
         prompt: Vec<u32>,
         kv_view: KvView,
@@ -3862,6 +3996,7 @@ impl StepCommand {
             Self::Prefill { .. } => "prefill",
             Self::Decode { .. } => "decode",
             Self::PrefillLastHidden { .. } => "prefill_hidden",
+            Self::DecodeEmbeddingLastHidden { .. } => "decode_embedding_hidden",
             Self::PrefillLayerHidden { .. } => "prefill_layer_hidden",
             Self::PrefillLayerStages { .. } => "prefill_layer_stages",
             Self::Unified { .. } => "unified",
@@ -3948,6 +4083,7 @@ enum WorkerStepOutcome {
     Decode(DecodeResult),
     Unified(UnifiedResult),
     PrefillHidden(PrefillHiddenResult),
+    RetainedEmbeddingDecodeHidden(RetainedEmbeddingDecodeHiddenResult),
     PrefillLayerHidden(PrefillLayerHiddenResult),
     PrefillStages(PrefillStageResult),
     /// Split-concurrent: decode result is ready; prefill is still in-flight
@@ -3971,6 +4107,7 @@ impl WorkerStepOutcome {
             Self::Decode(_) => "decode",
             Self::Unified(_) => "unified",
             Self::PrefillHidden(_) => "prefill_hidden",
+            Self::RetainedEmbeddingDecodeHidden(_) => "decode_embedding_hidden",
             Self::PrefillLayerHidden(_) => "prefill_layer_hidden",
             Self::PrefillStages(_) => "prefill_layer_stages",
             Self::SplitDecodeReady { .. } => "split_decode_ready",

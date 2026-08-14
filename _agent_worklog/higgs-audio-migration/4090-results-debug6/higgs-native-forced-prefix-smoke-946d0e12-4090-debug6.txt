@@ -1,0 +1,25 @@
+warning: pegainfer-kernels@0.1.0: Detected CUDA SM targets: sm_89
+warning: pegainfer-kernels@0.1.0: Compiling CUDA kernels for nvcc targets: sm_89
+warning: pegainfer-kernels@0.1.0: Legacy CUDA translation units retired from the runtime build: activation.cu, embedding.cu, fused_attention.cu
+warning: pegainfer-kernels@0.1.0: Compiling CUDA translation units with 8 nvcc job(s)
+warning: pegainfer-kernels@0.1.0: Using FlashInfer include dir: /data/src/pegainfer/pegainfer-kernels/third_party/flashinfer/include
+warning: pegainfer-kernels@0.1.0: MoE third-party substrate disabled; enable the pegainfer-kernels `moe` feature to build DeepEP-backed kernels
+warning: pegainfer-kernels@0.1.0: GLM5.2 DeepGEMM/FlashMLA interfaces disabled; enable the pegainfer-kernels `glm52` feature to build them
+warning: pegainfer-kernels@0.1.0: Kimi-K2 CUDA kernels disabled; enable the pegainfer-kernels `kimi-k2` feature to build them
+warning: pegainfer-kernels@0.1.0: Qwen3.5 Triton AOT kernels disabled; enable the pegainfer-kernels `qwen35` feature to build them (needs Python + Triton at build time)
+   Compiling pegainfer-higgs-audio v0.1.0 (/data/src/pegainfer/pegainfer-higgs-audio)
+    Finished `release` profile [optimized] target(s) in 4.62s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running `target/release/higgs_native_forced_prefix_smoke --model-dir /root/autodl-tmp/models/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561 --golden /root/autodl-tmp/results/higgs-one-step-sglang-omni-golden-autodl.safetensors --reference-trace /data/results/pegainfer/higgs-audio/native-codegen/higgs-reference-incremental-trace-946d0e12-4090.json --trace-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-native-forced-prefix-trace-946d0e12-4090-debug6.json --codec-input-out /data/results/pegainfer/higgs-audio/native-codegen/higgs-native-forced-prefix-codec-input-946d0e12-4090-debug6.json`
+higgs native forced-prefix smoke: ok
+  model_dir: /root/autodl-tmp/models/higgs-tts-3-4b-7556c17e05201fccd9c8cc120bc216dcc7b5d561
+  golden: /root/autodl-tmp/results/higgs-one-step-sglang-omni-golden-autodl.safetensors
+  reference_trace: /data/results/pegainfer/higgs-audio/native-codegen/higgs-reference-incremental-trace-946d0e12-4090.json
+  prompt_tokens: 10
+  session_id: 1
+  continuation_steps: 8
+  trace_steps: 9
+  raw_codec_rows: 2
+  trace_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-native-forced-prefix-trace-946d0e12-4090-debug6.json
+  codec_input_out: /data/results/pegainfer/higgs-audio/native-codegen/higgs-native-forced-prefix-codec-input-946d0e12-4090-debug6.json

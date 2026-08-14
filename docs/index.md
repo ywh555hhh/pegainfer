@@ -65,6 +65,18 @@ Organized by domain (model line / subsystem / playbook / lesson) instead of by l
 | `models/gemma4/tokenizer.md` | Gemma 4 tokenizer/chat-template contracts, gated against a Hugging Face reference (token ids plus all five chat renders, content flattened to strings): BOS comes only from the standalone `chat_template.jinja` (which opens a thought channel and accepts a native system role), EOS is declared three times with three values, the published defaults are sampled rather than greedy, image/audio tokens encode straight from user text so text-only serving must reject them at admission, and one divergence stays open — the server's default content format adds a trailing space to system turns. |
 | `models/gemma4/hf-golden.md` | The Hugging Face reference for 12B: layer-boundary activations at both ends of both layer types plus top-64 logprobs, over a single-token, a nine-token and a 1024-token (exactly the sliding window) case. Pins three facts the forward path has to match — the embedding scale is bf16 62.0 rather than `sqrt(3840)`, text attention is causal, and `layer_scalar` applies to the layer output after both residual adds. Regeneration is byte-identical and checked with sha256. |
 
+## models / higgs-audio
+
+| Path | TL;DR |
+| --- | --- |
+| `models/higgs-audio/a-layer-validation.md` | Higgs-Audio foundation scope: checkpoint/config loading, Qwen3 text-backbone prefill, traceable hidden-state boundaries, and one-step audio-head semantic parity; no full decode, codec, or wav claim. |
+| `models/higgs-audio/4090-migration-runbook.md` | Migration runbook for resuming Higgs-Audio native retained-KV validation on a fresh RTX 4090 host: durable overlay bundle, host requirements, validation command, expected artifacts, and copy-back workflow. |
+| `models/higgs-audio/native-code-generation-plan.md` | Next milestone is native Rust + CUDA incremental audio-code generation, not native wav E2E: feature-gated model-line detection, fail-closed launch boundary, retained prompt KV, repeated code steps, trace artifacts, reference gates, and profiling evidence. |
+| `models/higgs-audio/native-codec-vocoder.md` | Strict trace parity is no longer the next bottleneck; the active native E2E path is a model-local Rust + CUDA codec/vocoder port. Current 4090 slice runs retained codegen through quantizer `project_out`, `fc2`, acoustic decoder `conv1`, and the full decoder block0 residual stack; remaining upsampling blocks and waveform E2E stay fail-closed. |
+| `models/higgs-audio/native-codegen-pr-notes.md` | PR body skeleton for the Higgs-Audio native incremental audio-code-generation slice: scope, design boundary, validation evidence, limitations, and the Qwen3 diagnostic API tradeoff. |
+| `models/higgs-audio/next-stage-todo.md` | Next-stage execution checklist for Higgs-Audio native incremental audio-code generation: lock the review boundary, run 4090 retained-KV trace validation, capture nsys/ncu evidence, and render PR-ready evidence without over-claiming native audio E2E. |
+| `models/higgs-audio/retained-decode-hidden-boundary.md` | Higgs-Audio native audio-code continuation needs final normed hidden from retained-KV Qwen3 decode, but the current public Qwen3 runtime returns sampled text tokens only; records the non-invasive options and next-slice acceptance gate. |
+
 ## models / glm52
 
 | Path | TL;DR |

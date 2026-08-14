@@ -181,7 +181,88 @@ impl Qwen3Model {
         Ok(())
     }
 
+    /// Diagnostic retained decode step that consumes an already-materialized
+    /// input embedding and returns the final normed hidden state before
+    /// `lm_head`.
+    ///
+    /// This intentionally runs eager: the host-to-device embedding copy is a
+    /// diagnostic/runtime-bridge surface, not part of the captured text-token
+    /// serving graph.
+    pub(crate) fn batch_decode_embedding_last_hidden(
+        &self,
+        input_embedding_bf16: &[bf16],
+        kv_view: &KvView,
+        kv_buffer: &CudaSlice<bf16>,
+        layout: &KvLayout,
+        bufs: &mut BatchDecodeBuffers,
+    ) -> Result<Vec<bf16>> {
+        anyhow::ensure!(
+            input_embedding_bf16.len() == self.config().hidden_size,
+            "decode input embedding len mismatch: expected {}, got {}",
+            self.config().hidden_size,
+            input_embedding_bf16.len()
+        );
+        assert_eq!(
+            pegainfer_kernels::ops::numeric_policy(),
+            bufs.policy_at_construction,
+            "NumericPolicy changed after executor construction (policy-key-trap); build a fresh executor per policy"
+        );
+
+        let padded_bs = 1;
+        bufs.set_batch_size(padded_bs);
+
+        let positions = [(kv_view.seq_len() - 1) as i32];
+        self.ctx
+            .stream
+            .memcpy_htod(input_embedding_bf16, &mut bufs.hidden.data)?;
+        self.ctx
+            .stream
+            .memcpy_htod(&positions, &mut bufs.positions_d)?;
+
+        let kv_refs = [kv_view];
+        bufs.sync_paged_meta(&self.ctx, &kv_refs, padded_bs)?;
+        crate::green_ctx::fence_producers_before_override(&self.ctx)?;
+        let attention_path =
+            BatchDecodeBuffers::attention_path(padded_bs, bufs.policy_at_construction);
+        self.batch_decode_body_kernels(kv_buffer, layout, padded_bs, attention_path, false, bufs)?;
+
+        let host = self
+            .ctx
+            .stream
+            .clone_dtoh(&bufs.normed.data)
+            .map_err(|e| anyhow::anyhow!("D2H decode final hidden copy failed: {e}"))?;
+        self.ctx.sync()?;
+        Ok(host[..self.config().hidden_size].to_vec())
+    }
+
     fn batch_decode_kernels(
+        &self,
+        kv_buffer: &cudarc::driver::CudaSlice<half::bf16>,
+        layout: &KvLayout,
+        bs: usize,
+        attention_path: DecodeAttentionPath,
+        use_lora: bool,
+        bufs: &mut BatchDecodeBuffers,
+    ) -> Result<()> {
+        let dag = BatchDecodeDag::new(self, kv_buffer, layout, bs, attention_path);
+
+        // Embedding: N token_ids → hidden [hidden_dim, bs]
+        dag.embedding(dag_label!("embedding"), &bufs.token_ids_d, &mut bufs.hidden)?;
+
+        self.batch_decode_body_kernels(kv_buffer, layout, bs, attention_path, use_lora, bufs)?;
+
+        // Output projection: logits [vocab_size, bs]
+        dag.lm_head(
+            dag_label!("lm_head"),
+            self.output_projection(),
+            &bufs.normed,
+            &mut bufs.logits,
+        );
+
+        Ok(())
+    }
+
+    fn batch_decode_body_kernels(
         &self,
         kv_buffer: &cudarc::driver::CudaSlice<half::bf16>,
         layout: &KvLayout,
@@ -192,9 +273,6 @@ impl Qwen3Model {
     ) -> Result<()> {
         let num_layers = self.layers.len();
         let dag = BatchDecodeDag::new(self, kv_buffer, layout, bs, attention_path);
-
-        // Embedding: N token_ids → hidden [hidden_dim, bs]
-        dag.embedding(dag_label!("embedding"), &bufs.token_ids_d, &mut bufs.hidden)?;
 
         // First layer norm
         dag.rms_norm(
@@ -235,14 +313,6 @@ impl Qwen3Model {
                 &mut bufs.normed,
             )?;
         }
-
-        // Output projection: logits [vocab_size, bs]
-        dag.lm_head(
-            dag_label!("lm_head"),
-            self.output_projection(),
-            &bufs.normed,
-            &mut bufs.logits,
-        );
 
         Ok(())
     }
